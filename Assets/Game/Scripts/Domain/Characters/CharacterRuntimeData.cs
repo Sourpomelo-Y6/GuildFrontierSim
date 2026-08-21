@@ -69,6 +69,7 @@ namespace GuildFrontierSim.Domain.Characters
         public CharacterStatus Status { get; private set; }
         public int UnavailableTurnsRemaining { get; private set; }
         public bool IsPlayerCharacter { get; }
+        public bool IsDeparturePending { get; private set; }
 
         public void ApplyDamage(int damage)
         {
@@ -128,6 +129,11 @@ namespace GuildFrontierSim.Domain.Characters
             {
                 Status = CharacterStatus.Available;
             }
+        }
+
+        public void MarkDeparturePending()
+        {
+            IsDeparturePending = true;
         }
     }
 }

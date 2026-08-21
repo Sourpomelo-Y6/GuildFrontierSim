@@ -94,7 +94,9 @@ namespace GuildFrontierSim.Tests
             int maximumDefenseReward = 150,
             float defeatDefenseRewardMultiplier = 0.5f,
             int salaryIntervalTurns = 5,
-            int unpaidSalaryLoyaltyPenalty = 10)
+            int unpaidSalaryLoyaltyPenalty = 10,
+            int victoryLoyaltyChange = 2,
+            int defeatLoyaltyChange = -3)
         {
             BattleBalanceSettings settings =
                 ScriptableObject.CreateInstance<BattleBalanceSettings>();
@@ -126,6 +128,10 @@ namespace GuildFrontierSim.Tests
                 salaryIntervalTurns;
             serializedObject.FindProperty("unpaidSalaryLoyaltyPenalty").intValue =
                 unpaidSalaryLoyaltyPenalty;
+            serializedObject.FindProperty("victoryLoyaltyChange").intValue =
+                victoryLoyaltyChange;
+            serializedObject.FindProperty("defeatLoyaltyChange").intValue =
+                defeatLoyaltyChange;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             return settings;
         }

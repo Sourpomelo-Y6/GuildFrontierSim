@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using GuildFrontierSim.Domain.Characters;
 using GuildFrontierSim.Domain.Expeditions;
 
@@ -94,6 +95,36 @@ namespace GuildFrontierSim.Domain.Guilds
             }
 
             return charactersById.TryGetValue(characterId, out character);
+        }
+
+        public bool TryRemoveCharacter(string characterId)
+        {
+            if (!TryGetCharacter(characterId, out CharacterRuntimeData character) ||
+                characters.Count <= 1 ||
+                string.Equals(characterId, LeaderCharacterId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            for (int index = 0; index < expeditions.Count; index++)
+            {
+                if (expeditions[index].ParticipantIds.Contains(characterId))
+                {
+                    return false;
+                }
+            }
+
+            charactersById.Remove(characterId);
+            bool removed = characters.Remove(character);
+            if (string.Equals(
+                ActingLeaderCharacterId,
+                characterId,
+                StringComparison.Ordinal))
+            {
+                ActingLeaderCharacterId = string.Empty;
+            }
+
+            return removed;
         }
 
         public void AddFunds(int amount)
