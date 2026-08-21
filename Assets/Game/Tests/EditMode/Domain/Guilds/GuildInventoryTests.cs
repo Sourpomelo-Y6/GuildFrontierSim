@@ -24,5 +24,18 @@ namespace GuildFrontierSim.Tests.Domain.Guilds
             Assert.Throws<ArgumentOutOfRangeException>(
                 () => new GuildInventory().Add("potion", 0));
         }
+
+        [Test]
+        public void RetainFraction_RoundsDownAndRemovesEmptyEntries()
+        {
+            var inventory = new GuildInventory();
+            inventory.Add("potion", 3);
+            inventory.Add("ore", 1);
+
+            inventory.RetainFraction(0.5f);
+
+            Assert.That(inventory.GetQuantity("potion"), Is.EqualTo(1));
+            Assert.That(inventory.GetQuantity("ore"), Is.Zero);
+        }
     }
 }

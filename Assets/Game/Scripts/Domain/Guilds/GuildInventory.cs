@@ -54,6 +54,34 @@ namespace GuildFrontierSim.Domain.Guilds
             return true;
         }
 
+        public void RetainFraction(float ratio)
+        {
+            if (ratio < 0f || ratio > 1f || float.IsNaN(ratio))
+            {
+                throw new ArgumentOutOfRangeException(nameof(ratio));
+            }
+
+            var itemIds = new List<string>(quantities.Keys);
+            for (int index = 0; index < itemIds.Count; index++)
+            {
+                string itemId = itemIds[index];
+                int retained = (int)Math.Floor(quantities[itemId] * ratio);
+                if (retained == 0)
+                {
+                    quantities.Remove(itemId);
+                }
+                else
+                {
+                    quantities[itemId] = retained;
+                }
+            }
+        }
+
+        public void Clear()
+        {
+            quantities.Clear();
+        }
+
         private static void ValidateItemId(string itemId)
         {
             if (string.IsNullOrWhiteSpace(itemId))

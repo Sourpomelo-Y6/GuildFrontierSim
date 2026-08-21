@@ -106,6 +106,24 @@ namespace GuildFrontierSim.Domain.Expeditions
             rescuedCharacterIds.Add(validatedId);
         }
 
+        public void RetainTemporaryLoot(float ratio)
+        {
+            if (ratio < 0f || ratio > 1f || float.IsNaN(ratio))
+            {
+                throw new ArgumentOutOfRangeException(nameof(ratio));
+            }
+
+            TemporaryFunds = (int)Math.Floor(TemporaryFunds * ratio);
+            TemporaryInventory.RetainFraction(ratio);
+        }
+
+        public void DiscardTemporaryLoot()
+        {
+            TemporaryFunds = 0;
+            TemporaryInventory.Clear();
+            rescuedCharacterIds.Clear();
+        }
+
         public void AdvanceStage()
         {
             EnsureActive();

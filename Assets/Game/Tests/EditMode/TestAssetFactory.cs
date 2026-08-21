@@ -144,6 +144,36 @@ namespace GuildFrontierSim.Tests
             return settings;
         }
 
+        public static ExpeditionBalanceSettings CreateExpeditionBalanceSettings(
+            float enemyPowerGrowthPerStage = 0.15f,
+            int minimumStageFunds = 50,
+            int maximumStageFunds = 100,
+            float escapeChance = 0.65f,
+            float escapedLootRetentionRatio = 0.5f,
+            int returnFundsThreshold = 300,
+            float minimumPartyHpRatioToContinue = 0.4f,
+            float captiveRescueChance = 0.2f)
+        {
+            ExpeditionBalanceSettings settings =
+                ScriptableObject.CreateInstance<ExpeditionBalanceSettings>();
+            var serializedObject = new SerializedObject(settings);
+            serializedObject.FindProperty("enemyPowerGrowthPerStage").floatValue =
+                enemyPowerGrowthPerStage;
+            serializedObject.FindProperty("minimumStageFunds").intValue = minimumStageFunds;
+            serializedObject.FindProperty("maximumStageFunds").intValue = maximumStageFunds;
+            serializedObject.FindProperty("escapeChance").floatValue = escapeChance;
+            serializedObject.FindProperty("escapedLootRetentionRatio").floatValue =
+                escapedLootRetentionRatio;
+            serializedObject.FindProperty("returnFundsThreshold").intValue =
+                returnFundsThreshold;
+            serializedObject.FindProperty("minimumPartyHpRatioToContinue").floatValue =
+                minimumPartyHpRatioToContinue;
+            serializedObject.FindProperty("captiveRescueChance").floatValue =
+                captiveRescueChance;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            return settings;
+        }
+
         public static void Destroy(params Object[] assets)
         {
             foreach (Object asset in assets)
