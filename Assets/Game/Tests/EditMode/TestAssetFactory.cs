@@ -186,6 +186,27 @@ namespace GuildFrontierSim.Tests
             return settings;
         }
 
+        public static GuildSimulationSettings CreateGuildSimulationSettings(
+            int defenseIntervalTurns = 1,
+            float defenseEnemyBasePower = 100f,
+            bool automaticallyStartExpeditions = true,
+            int expeditionIntervalTurns = 1)
+        {
+            GuildSimulationSettings settings =
+                ScriptableObject.CreateInstance<GuildSimulationSettings>();
+            var serializedObject = new SerializedObject(settings);
+            serializedObject.FindProperty("defenseIntervalTurns").intValue =
+                defenseIntervalTurns;
+            serializedObject.FindProperty("defenseEnemyBasePower").floatValue =
+                defenseEnemyBasePower;
+            serializedObject.FindProperty("automaticallyStartExpeditions").boolValue =
+                automaticallyStartExpeditions;
+            serializedObject.FindProperty("expeditionIntervalTurns").intValue =
+                expeditionIntervalTurns;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            return settings;
+        }
+
         public static void Destroy(params Object[] assets)
         {
             foreach (Object asset in assets)
