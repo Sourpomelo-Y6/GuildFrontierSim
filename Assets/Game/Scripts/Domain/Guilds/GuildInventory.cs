@@ -82,6 +82,37 @@ namespace GuildFrontierSim.Domain.Guilds
             quantities.Clear();
         }
 
+        public void EnsureCanAdd(IReadOnlyDictionary<string, int> additions)
+        {
+            if (additions == null)
+            {
+                throw new ArgumentNullException(nameof(additions));
+            }
+
+            foreach (KeyValuePair<string, int> addition in additions)
+            {
+                ValidateItemId(addition.Key);
+                if (addition.Value <= 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(additions));
+                }
+
+                checked
+                {
+                    _ = GetQuantity(addition.Key) + addition.Value;
+                }
+            }
+        }
+
+        public void AddRange(IReadOnlyDictionary<string, int> additions)
+        {
+            EnsureCanAdd(additions);
+            foreach (KeyValuePair<string, int> addition in additions)
+            {
+                quantities[addition.Key] = GetQuantity(addition.Key) + addition.Value;
+            }
+        }
+
         private static void ValidateItemId(string itemId)
         {
             if (string.IsNullOrWhiteSpace(itemId))

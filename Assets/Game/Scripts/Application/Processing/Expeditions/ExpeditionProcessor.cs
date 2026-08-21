@@ -86,6 +86,114 @@ namespace GuildFrontierSim.Application.Processing.Expeditions
             }
         }
 
+        public ExpeditionReturnResult CompleteReturn(
+            GuildRuntimeData guild,
+            string expeditionId)
+        {
+            if (guild == null)
+            {
+                throw new ArgumentNullException(nameof(guild));
+            }
+
+            if (!guild.TryGetExpedition(expeditionId, out ExpeditionRuntimeData expedition))
+            {
+                throw new ArgumentException("Expedition was not found.", nameof(expeditionId));
+            }
+
+            if (expedition.Status != ExpeditionStatus.Returning)
+            {
+                throw new InvalidOperationException("Only a returning expedition can be completed.");
+            }
+
+            List<CharacterRuntimeData> participants = ResolveParticipants(guild, expedition);
+            List<CharacterRuntimeData> rescuedCharacters = ResolveRescuedCharacters(guild, expedition);
+
+            checked
+            {
+                _ = guild.Funds + expedition.TemporaryFunds;
+            }
+
+            guild.Inventory.EnsureCanAdd(expedition.TemporaryInventory.Quantities);
+
+            int transferredFunds = expedition.TemporaryFunds;
+            var transferredItems = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, int> item in expedition.TemporaryInventory.Quantities)
+            {
+                transferredItems.Add(item.Key, item.Value);
+            }
+            var rescuedIds = new List<string>(expedition.RescuedCharacterIds);
+
+            guild.AddFunds(transferredFunds);
+            guild.Inventory.AddRange(transferredItems);
+            for (int index = 0; index < participants.Count; index++)
+            {
+                participants[index].SetStatus(CharacterStatus.Available);
+            }
+
+            for (int index = 0; index < rescuedCharacters.Count; index++)
+            {
+                rescuedCharacters[index].SetStatus(CharacterStatus.Available);
+            }
+
+            expedition.ConsumeTemporaryLoot();
+            expedition.Complete();
+            if (!guild.RemoveExpedition(expedition.ExpeditionId))
+            {
+                throw new InvalidOperationException("Completed expedition could not be removed.");
+            }
+
+            return new ExpeditionReturnResult(
+                expedition.ExpeditionId,
+                transferredFunds,
+                transferredItems,
+                rescuedIds);
+        }
+
+        private static List<CharacterRuntimeData> ResolveParticipants(
+            GuildRuntimeData guild,
+            ExpeditionRuntimeData expedition)
+        {
+            var participants = new List<CharacterRuntimeData>(expedition.ParticipantIds.Count);
+            for (int index = 0; index < expedition.ParticipantIds.Count; index++)
+            {
+                string participantId = expedition.ParticipantIds[index];
+                if (!guild.TryGetCharacter(participantId, out CharacterRuntimeData participant) ||
+                    participant.Status != CharacterStatus.Expedition)
+                {
+                    throw new InvalidOperationException(
+                        $"Expedition participant is unavailable for return: {participantId}");
+                }
+
+                participants.Add(participant);
+            }
+
+            return participants;
+        }
+
+        private static List<CharacterRuntimeData> ResolveRescuedCharacters(
+            GuildRuntimeData guild,
+            ExpeditionRuntimeData expedition)
+        {
+            var participants = new HashSet<string>(expedition.ParticipantIds, StringComparer.Ordinal);
+            var rescuedCharacters = new List<CharacterRuntimeData>(
+                expedition.RescuedCharacterIds.Count);
+            for (int index = 0; index < expedition.RescuedCharacterIds.Count; index++)
+            {
+                string rescuedId = expedition.RescuedCharacterIds[index];
+                if (participants.Contains(rescuedId) ||
+                    !guild.TryGetCharacter(rescuedId, out CharacterRuntimeData rescued) ||
+                    rescued.Status != CharacterStatus.Captured)
+                {
+                    throw new InvalidOperationException(
+                        $"Rescued character is invalid for return: {rescuedId}");
+                }
+
+                rescuedCharacters.Add(rescued);
+            }
+
+            return rescuedCharacters;
+        }
+
         private static void RestoreParticipants(
             IReadOnlyList<CharacterRuntimeData> participants)
         {

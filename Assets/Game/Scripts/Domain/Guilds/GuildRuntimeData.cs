@@ -177,6 +177,17 @@ namespace GuildFrontierSim.Domain.Guilds
             return expeditionsById.TryGetValue(expeditionId, out expedition);
         }
 
+        public bool RemoveExpedition(string expeditionId)
+        {
+            if (!TryGetExpedition(expeditionId, out ExpeditionRuntimeData expedition))
+            {
+                return false;
+            }
+
+            expeditionsById.Remove(expeditionId);
+            return expeditions.Remove(expedition);
+        }
+
         public void SetActingLeader(string characterId)
         {
             if (string.IsNullOrEmpty(characterId))

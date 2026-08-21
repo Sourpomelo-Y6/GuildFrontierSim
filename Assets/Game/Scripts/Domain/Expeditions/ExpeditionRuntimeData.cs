@@ -124,6 +124,12 @@ namespace GuildFrontierSim.Domain.Expeditions
             rescuedCharacterIds.Clear();
         }
 
+        public void ConsumeTemporaryLoot()
+        {
+            TemporaryFunds = 0;
+            TemporaryInventory.Clear();
+        }
+
         public void AdvanceStage()
         {
             EnsureActive();

@@ -7,6 +7,24 @@ namespace GuildFrontierSim.Tests.Domain.Guilds
     public sealed class GuildInventoryTests
     {
         [Test]
+        public void AddRange_WhenOneItemOverflows_DoesNotAddAnyItems()
+        {
+            var inventory = new GuildInventory();
+            inventory.Add("ore", int.MaxValue);
+
+            Assert.Throws<System.OverflowException>(
+                () => inventory.AddRange(
+                    new System.Collections.Generic.Dictionary<string, int>
+                    {
+                        { "herb", 2 },
+                        { "ore", 1 }
+                    }));
+
+            Assert.That(inventory.GetQuantity("herb"), Is.Zero);
+            Assert.That(inventory.GetQuantity("ore"), Is.EqualTo(int.MaxValue));
+        }
+
+        [Test]
         public void AddAndRemove_MaintainNonNegativeQuantity()
         {
             var inventory = new GuildInventory();
