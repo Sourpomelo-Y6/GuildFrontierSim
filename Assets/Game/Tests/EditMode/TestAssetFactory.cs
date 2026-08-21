@@ -58,6 +58,26 @@ namespace GuildFrontierSim.Tests
             return preset;
         }
 
+        public static ExpeditionAreaDefinition CreateExpeditionArea(
+            string id,
+            int enemyPower = 100,
+            int maximumStages = 3,
+            float rewardMultiplier = 1f,
+            bool canContainCaptives = true)
+        {
+            ExpeditionAreaDefinition area =
+                ScriptableObject.CreateInstance<ExpeditionAreaDefinition>();
+            var serializedObject = new SerializedObject(area);
+            serializedObject.FindProperty("id").stringValue = id;
+            serializedObject.FindProperty("displayName").stringValue = id;
+            serializedObject.FindProperty("enemyPower").intValue = enemyPower;
+            serializedObject.FindProperty("maximumStages").intValue = maximumStages;
+            serializedObject.FindProperty("rewardMultiplier").floatValue = rewardMultiplier;
+            serializedObject.FindProperty("canContainCaptives").boolValue = canContainCaptives;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            return area;
+        }
+
         public static BattleBalanceSettings CreateBattleSettings(
             float attackWeight = 1f,
             float defenseWeight = 0.75f,

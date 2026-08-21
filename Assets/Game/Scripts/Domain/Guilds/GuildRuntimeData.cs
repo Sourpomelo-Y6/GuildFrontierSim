@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GuildFrontierSim.Domain.Characters;
+using GuildFrontierSim.Domain.Expeditions;
 
 namespace GuildFrontierSim.Domain.Guilds
 {
@@ -8,6 +9,10 @@ namespace GuildFrontierSim.Domain.Guilds
     {
         private readonly List<CharacterRuntimeData> characters;
         private readonly Dictionary<string, CharacterRuntimeData> charactersById;
+        private readonly List<ExpeditionRuntimeData> expeditions =
+            new List<ExpeditionRuntimeData>();
+        private readonly Dictionary<string, ExpeditionRuntimeData> expeditionsById =
+            new Dictionary<string, ExpeditionRuntimeData>(StringComparer.Ordinal);
 
         public GuildRuntimeData(
             string guildName,
@@ -75,6 +80,7 @@ namespace GuildFrontierSim.Domain.Guilds
         public string LeaderCharacterId { get; private set; }
         public string ActingLeaderCharacterId { get; private set; } = string.Empty;
         public GuildInventory Inventory { get; }
+        public IReadOnlyList<ExpeditionRuntimeData> Expeditions => expeditions;
         public int CurrentTurn { get; private set; }
 
         public CharacterRuntimeData Leader => charactersById[LeaderCharacterId];
@@ -126,6 +132,49 @@ namespace GuildFrontierSim.Domain.Guilds
             }
 
             LeaderCharacterId = characterId;
+        }
+
+        public void AddExpedition(ExpeditionRuntimeData expedition)
+        {
+            if (expedition == null)
+            {
+                throw new ArgumentNullException(nameof(expedition));
+            }
+
+            if (expeditionsById.ContainsKey(expedition.ExpeditionId))
+            {
+                throw new ArgumentException(
+                    $"Duplicate expedition ID: {expedition.ExpeditionId}",
+                    nameof(expedition));
+            }
+
+            for (int index = 0; index < expedition.ParticipantIds.Count; index++)
+            {
+                string participantId = expedition.ParticipantIds[index];
+                if (!TryGetCharacter(participantId, out CharacterRuntimeData participant) ||
+                    participant.Status != CharacterStatus.Expedition)
+                {
+                    throw new ArgumentException(
+                        $"Expedition participant is not assigned to this guild expedition: {participantId}",
+                        nameof(expedition));
+                }
+            }
+
+            expeditions.Add(expedition);
+            expeditionsById.Add(expedition.ExpeditionId, expedition);
+        }
+
+        public bool TryGetExpedition(
+            string expeditionId,
+            out ExpeditionRuntimeData expedition)
+        {
+            if (string.IsNullOrWhiteSpace(expeditionId))
+            {
+                expedition = null;
+                return false;
+            }
+
+            return expeditionsById.TryGetValue(expeditionId, out expedition);
         }
 
         public void SetActingLeader(string characterId)
