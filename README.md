@@ -4,7 +4,7 @@
 
 プレイヤーはギルド所属の冒険者として活動し、状況に応じてギルドリーダーとして人員配置、防衛、遠征、資金管理などを行います。プレイヤーが経営を担当できない場合も、CPU がギルドの運営を継続します。
 
-> 現在は初期開発段階です。最初に「経営部分＋自動処理」だけで成立する Phase 1 プロトタイプを構築します。
+> Phase 1「経営自動シミュレーション」のプレイ可能なプロトタイプが完成しています。
 
 ## ゲームの特徴
 
@@ -21,9 +21,9 @@
 
 ## 現在の開発状況
 
-現在は Phase 1 の設計が完了し、実装開始前の状態です。
+Phase 1 の実装と完成確認が完了しています。Unityで`MainScene`を再生し、ボタンからターンを進めると、CPUによる防衛・遠征・給料・忠誠度・回復・リーダー処理を確認できます。
 
-Phase 1では次のゲームサイクルを目標にします。
+現在実行できるゲームサイクルは次のとおりです。
 
 ```text
 ギルド状態確認
@@ -50,6 +50,8 @@ Phase 1では次のゲームサイクルを目標にします。
 - リーダーが活動不能になった場合に代理または後任が決まる
 - 状態変化を最小 UI または `Debug.Log` で確認できる
 
+上記の最低目標はすべて実装済みです。確認内容は[Phase 1完成確認レポート](Docs/Phase1CompletionReport.md)を参照してください。
+
 ## 開発環境
 
 - Unity `2021.3.45f2`
@@ -74,6 +76,16 @@ Unity Hubから上記のUnity Editorバージョンをインストールして�
 3. Unity `2021.3.45f2` でプロジェクトを開きます。
 4. Package Managerによるパッケージ復元と、初回インポートの完了を待ちます。
 5. `Assets/Scenes/MainScene.unity` を開きます。
+6. Unityの再生ボタンを押します。
+7. 画面の「次のターン」を押してシミュレーションを進めます。「最初から」で初期状態へ戻せます。
+
+### テストと開発ビルド
+
+- EditModeテスト: 136件
+- PlayModeテスト: 1件（実シーンのターン進行とリセット）
+- Windows 64-bit Development Build: 作成・起動確認済み
+
+Unity Editorメニューの`Guild Frontier Sim > Build Windows Development Player`から、`Builds/Windows`へ開発ビルドを生成できます。`Builds`フォルダはGit管理対象外です。
 
 `Library`、`Logs`、`UserSettings`などはGit管理されません。これらを手動で共有する必要はありません。
 
@@ -81,6 +93,7 @@ Unity Hubから上記のUnity Editorバージョンをインストールして�
 
 - [開発指示・基本設計](Docs/GuildFrontierSimDevelopmentGuide.md)
 - [Phase 1 経営自動シミュレーション設計](Docs/Phase1Design.md)
+- [Phase 1 完成確認レポート](Docs/Phase1CompletionReport.md)
 - [ComfyUI キャラクターグラフィック生成・連携設計](Docs/ComfyUICharacterGraphicsIntegration.md)
 
 実装時は、まずメインの開発指示と対象フェーズの設計書を確認してください。
@@ -108,7 +121,7 @@ UnityはComfyUIへ直接接続しません。そのため、ComfyUIやWPFツー�
 
 ### Phase 1：経営自動シミュレーション
 
-ターン進行、CPU経営、自動戦闘、防衛、遠征、給料、忠誠度、負傷、虜囚、リーダー交代を実装します。
+完了。ターン進行、CPU経営、自動戦闘、防衛、遠征、給料、忠誠度、負傷、虜囚、リーダー交代、最小UIを実装済みです。
 
 ### Phase 2：手動経営
 

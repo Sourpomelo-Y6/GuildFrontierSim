@@ -13,6 +13,7 @@ namespace GuildFrontierSim.Presentation
     {
         [SerializeField] private GuildSimulationController controller;
         [SerializeField] private Button advanceTurnButton;
+        [SerializeField] private Button resetButton;
         [SerializeField] private Text summaryText;
         [SerializeField] private Text membersText;
         [SerializeField] private Text expeditionsText;
@@ -29,6 +30,7 @@ namespace GuildFrontierSim.Presentation
 
             controller.SimulationAdvanced += OnSimulationAdvanced;
             advanceTurnButton.onClick.AddListener(OnAdvanceTurnClicked);
+            resetButton.onClick.AddListener(OnResetClicked);
             if (controller.TryInitialize())
             {
                 Refresh();
@@ -45,6 +47,11 @@ namespace GuildFrontierSim.Presentation
             if (advanceTurnButton != null)
             {
                 advanceTurnButton.onClick.RemoveListener(OnAdvanceTurnClicked);
+            }
+
+            if (resetButton != null)
+            {
+                resetButton.onClick.RemoveListener(OnResetClicked);
             }
         }
 
@@ -74,10 +81,19 @@ namespace GuildFrontierSim.Presentation
             Refresh();
         }
 
+        private void OnResetClicked()
+        {
+            if (controller.ResetSimulation())
+            {
+                Refresh();
+            }
+        }
+
         private bool ValidateReferences()
         {
             if (controller != null &&
                 advanceTurnButton != null &&
+                resetButton != null &&
                 summaryText != null &&
                 membersText != null &&
                 expeditionsText != null &&

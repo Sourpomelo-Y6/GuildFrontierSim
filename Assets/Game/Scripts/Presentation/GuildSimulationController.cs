@@ -75,6 +75,13 @@ namespace GuildFrontierSim.Presentation
             AdvanceTurnAndGetResult();
         }
 
+        public bool ResetSimulation()
+        {
+            Simulation = null;
+            LastAdvanceResult = null;
+            return TryInitialize();
+        }
+
         public SimulationAdvanceResult AdvanceTurnAndGetResult()
         {
             if (!IsInitialized && !TryInitialize())

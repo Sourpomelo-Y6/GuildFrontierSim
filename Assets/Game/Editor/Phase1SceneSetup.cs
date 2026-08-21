@@ -5,6 +5,7 @@ using GuildFrontierSim.Data.Settings;
 using GuildFrontierSim.Presentation;
 using UnityEditor;
 using UnityEditor.SceneManagement;
+using UnityEditor.Build.Reporting;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -44,6 +45,24 @@ namespace GuildFrontierSim.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log($"Phase 1 scene and data were generated at {ScenePath}.");
+        }
+
+        [MenuItem("Guild Frontier Sim/Build Windows Development Player")]
+        public static void BuildWindowsDevelopment()
+        {
+            BuildReport report = BuildPipeline.BuildPlayer(
+                new[] { ScenePath },
+                "Builds/Windows/GuildFrontierSim.exe",
+                BuildTarget.StandaloneWindows64,
+                BuildOptions.Development);
+            if (report.summary.result != BuildResult.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    $"Windows development build failed: {report.summary.result}");
+            }
+
+            Debug.Log(
+                $"Windows development build succeeded: {report.summary.totalSize} bytes");
         }
 
         private static CharacterDefinition CreateCharacter(
@@ -157,11 +176,14 @@ namespace GuildFrontierSim.Editor
             Text logs = CreateText(canvas.transform, "Logs", string.Empty, 17);
             SetRect(logs.rectTransform, 948, -430, 948, 500);
             Button button = CreateButton(canvas.transform, "Advance Turn", "次のターン");
-            SetRect((RectTransform)button.transform, 24, -900, 900, 120);
+            SetRect((RectTransform)button.transform, 24, -900, 680, 120);
+            Button resetButton = CreateButton(canvas.transform, "Reset Simulation", "最初から");
+            SetRect((RectTransform)resetButton.transform, 724, -900, 200, 120);
 
             SerializedObject viewSerialized = new SerializedObject(view);
             viewSerialized.FindProperty("controller").objectReferenceValue = controller;
             viewSerialized.FindProperty("advanceTurnButton").objectReferenceValue = button;
+            viewSerialized.FindProperty("resetButton").objectReferenceValue = resetButton;
             viewSerialized.FindProperty("summaryText").objectReferenceValue = summary;
             viewSerialized.FindProperty("membersText").objectReferenceValue = members;
             viewSerialized.FindProperty("expeditionsText").objectReferenceValue = expeditions;

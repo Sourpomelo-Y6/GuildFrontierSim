@@ -33,6 +33,12 @@ namespace GuildFrontierSim.Tests.PlayMode
             Assert.That(controller.Guild.CurrentTurn, Is.EqualTo(1));
             Assert.That(summaryObject.GetComponent<Text>().text, Does.Contain("ターン: 1"));
             Assert.That(controller.LastAdvanceResult, Is.Not.Null);
+
+            GameObject.Find("Reset Simulation").GetComponent<Button>().onClick.Invoke();
+            yield return null;
+
+            Assert.That(controller.Guild.CurrentTurn, Is.Zero);
+            Assert.That(summaryObject.GetComponent<Text>().text, Does.Contain("ターン: 0"));
         }
     }
 }
