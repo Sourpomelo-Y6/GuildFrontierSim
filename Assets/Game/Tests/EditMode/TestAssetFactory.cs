@@ -1,5 +1,6 @@
 using GuildFrontierSim.Data.Definitions;
 using GuildFrontierSim.Data.Presets;
+using GuildFrontierSim.Data.Settings;
 using UnityEditor;
 using UnityEngine;
 
@@ -55,6 +56,29 @@ namespace GuildFrontierSim.Tests
 
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             return preset;
+        }
+
+        public static BattleBalanceSettings CreateBattleSettings(
+            float attackWeight = 1f,
+            float defenseWeight = 0.75f,
+            float hitPointWeight = 0.1f,
+            float speedWeight = 0.5f,
+            float minimumPowerMultiplier = 0.85f,
+            float maximumPowerMultiplier = 1.15f)
+        {
+            BattleBalanceSettings settings =
+                ScriptableObject.CreateInstance<BattleBalanceSettings>();
+            var serializedObject = new SerializedObject(settings);
+            serializedObject.FindProperty("attackWeight").floatValue = attackWeight;
+            serializedObject.FindProperty("defenseWeight").floatValue = defenseWeight;
+            serializedObject.FindProperty("hitPointWeight").floatValue = hitPointWeight;
+            serializedObject.FindProperty("speedWeight").floatValue = speedWeight;
+            serializedObject.FindProperty("minimumPowerMultiplier").floatValue =
+                minimumPowerMultiplier;
+            serializedObject.FindProperty("maximumPowerMultiplier").floatValue =
+                maximumPowerMultiplier;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            return settings;
         }
 
         public static void Destroy(params Object[] assets)
