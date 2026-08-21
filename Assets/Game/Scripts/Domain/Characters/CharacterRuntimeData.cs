@@ -103,10 +103,21 @@ namespace GuildFrontierSim.Domain.Characters
                 throw new ArgumentOutOfRangeException(nameof(unavailableTurns));
             }
 
-            if (status == CharacterStatus.Available && unavailableTurns != 0)
+            bool isTimedRecoveryStatus =
+                status == CharacterStatus.Injured ||
+                status == CharacterStatus.Hospitalized ||
+                status == CharacterStatus.Resting;
+            if (isTimedRecoveryStatus && unavailableTurns < 1)
             {
                 throw new ArgumentException(
-                    "Available characters cannot have unavailable turns.",
+                    "Recovery statuses require at least one unavailable turn.",
+                    nameof(unavailableTurns));
+            }
+
+            if (!isTimedRecoveryStatus && unavailableTurns != 0)
+            {
+                throw new ArgumentException(
+                    "Only recovery statuses can have unavailable turns.",
                     nameof(unavailableTurns));
             }
 

@@ -42,6 +42,25 @@ namespace GuildFrontierSim.Tests.Domain.Characters
             Assert.Throws<ArgumentException>(() => CreateCharacter(" "));
         }
 
+        [TestCase(CharacterStatus.Injured)]
+        [TestCase(CharacterStatus.Hospitalized)]
+        [TestCase(CharacterStatus.Resting)]
+        public void SetStatus_WhenRecoveryTurnsAreMissing_Throws(CharacterStatus status)
+        {
+            CharacterRuntimeData character = CreateCharacter();
+
+            Assert.Throws<ArgumentException>(() => character.SetStatus(status));
+        }
+
+        [Test]
+        public void SetStatus_WhenNonRecoveryStatusHasTurns_Throws()
+        {
+            CharacterRuntimeData character = CreateCharacter();
+
+            Assert.Throws<ArgumentException>(
+                () => character.SetStatus(CharacterStatus.Captured, 1));
+        }
+
         [TestCase(-101)]
         [TestCase(101)]
         public void Constructor_WhenLoyaltyIsOutsideRange_Throws(int loyalty)
