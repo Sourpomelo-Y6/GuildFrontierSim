@@ -81,6 +81,26 @@ namespace GuildFrontierSim.Tests
             return settings;
         }
 
+        public static CpuSelectionSettings CreateCpuSelectionSettings(
+            int desiredDefenseMembers = 2,
+            int desiredExpeditionMembers = 3,
+            int minimumGuildMembersRemaining = 1,
+            float minimumHpRatio = 0.5f)
+        {
+            CpuSelectionSettings settings =
+                ScriptableObject.CreateInstance<CpuSelectionSettings>();
+            var serializedObject = new SerializedObject(settings);
+            serializedObject.FindProperty("desiredDefenseMembers").intValue =
+                desiredDefenseMembers;
+            serializedObject.FindProperty("desiredExpeditionMembers").intValue =
+                desiredExpeditionMembers;
+            serializedObject.FindProperty("minimumGuildMembersRemaining").intValue =
+                minimumGuildMembersRemaining;
+            serializedObject.FindProperty("minimumHpRatio").floatValue = minimumHpRatio;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            return settings;
+        }
+
         public static void Destroy(params Object[] assets)
         {
             foreach (Object asset in assets)
