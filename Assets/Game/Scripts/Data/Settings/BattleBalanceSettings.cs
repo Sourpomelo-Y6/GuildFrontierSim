@@ -18,6 +18,7 @@ namespace GuildFrontierSim.Data.Settings
         [SerializeField, Min(0f)] private float maximumPowerMultiplier = 1.15f;
 
         [Header("Consequences")]
+        [SerializeField, Range(0f, 1f)] private float victoryInjuryChance = 0.05f;
         [SerializeField, Range(0f, 1f)] private float injuryChance = 0.2f;
         [SerializeField, Range(0f, 1f)] private float hospitalizationChance = 0.05f;
         [SerializeField, Range(0f, 1f)] private float captureChance = 0.15f;
@@ -27,6 +28,7 @@ namespace GuildFrontierSim.Data.Settings
         [Header("Rewards")]
         [SerializeField, Min(0)] private int minimumDefenseReward = 50;
         [SerializeField, Min(0)] private int maximumDefenseReward = 150;
+        [SerializeField, Range(0f, 1f)] private float defeatDefenseRewardMultiplier = 0.5f;
         [SerializeField, Min(0)] private int minimumExpeditionReward = 75;
         [SerializeField, Min(0)] private int maximumExpeditionReward = 250;
 
@@ -42,6 +44,7 @@ namespace GuildFrontierSim.Data.Settings
         public float SpeedWeight => speedWeight;
         public float MinimumPowerMultiplier => minimumPowerMultiplier;
         public float MaximumPowerMultiplier => maximumPowerMultiplier;
+        public float VictoryInjuryChance => victoryInjuryChance;
         public float InjuryChance => injuryChance;
         public float HospitalizationChance => hospitalizationChance;
         public float CaptureChance => captureChance;
@@ -49,6 +52,7 @@ namespace GuildFrontierSim.Data.Settings
         public int MaximumRecoveryTurns => maximumRecoveryTurns;
         public int MinimumDefenseReward => minimumDefenseReward;
         public int MaximumDefenseReward => maximumDefenseReward;
+        public float DefeatDefenseRewardMultiplier => defeatDefenseRewardMultiplier;
         public int MinimumExpeditionReward => minimumExpeditionReward;
         public int MaximumExpeditionReward => maximumExpeditionReward;
         public int SalaryIntervalTurns => salaryIntervalTurns;

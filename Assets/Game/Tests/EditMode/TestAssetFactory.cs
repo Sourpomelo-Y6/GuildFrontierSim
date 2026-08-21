@@ -64,7 +64,15 @@ namespace GuildFrontierSim.Tests
             float hitPointWeight = 0.1f,
             float speedWeight = 0.5f,
             float minimumPowerMultiplier = 0.85f,
-            float maximumPowerMultiplier = 1.15f)
+            float maximumPowerMultiplier = 1.15f,
+            float victoryInjuryChance = 0.05f,
+            float injuryChance = 0.2f,
+            float hospitalizationChance = 0.05f,
+            int minimumRecoveryTurns = 1,
+            int maximumRecoveryTurns = 3,
+            int minimumDefenseReward = 50,
+            int maximumDefenseReward = 150,
+            float defeatDefenseRewardMultiplier = 0.5f)
         {
             BattleBalanceSettings settings =
                 ScriptableObject.CreateInstance<BattleBalanceSettings>();
@@ -77,6 +85,21 @@ namespace GuildFrontierSim.Tests
                 minimumPowerMultiplier;
             serializedObject.FindProperty("maximumPowerMultiplier").floatValue =
                 maximumPowerMultiplier;
+            serializedObject.FindProperty("victoryInjuryChance").floatValue =
+                victoryInjuryChance;
+            serializedObject.FindProperty("injuryChance").floatValue = injuryChance;
+            serializedObject.FindProperty("hospitalizationChance").floatValue =
+                hospitalizationChance;
+            serializedObject.FindProperty("minimumRecoveryTurns").intValue =
+                minimumRecoveryTurns;
+            serializedObject.FindProperty("maximumRecoveryTurns").intValue =
+                maximumRecoveryTurns;
+            serializedObject.FindProperty("minimumDefenseReward").intValue =
+                minimumDefenseReward;
+            serializedObject.FindProperty("maximumDefenseReward").intValue =
+                maximumDefenseReward;
+            serializedObject.FindProperty("defeatDefenseRewardMultiplier").floatValue =
+                defeatDefenseRewardMultiplier;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             return settings;
         }
