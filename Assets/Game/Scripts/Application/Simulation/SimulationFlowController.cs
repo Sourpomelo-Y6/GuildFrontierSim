@@ -75,6 +75,13 @@ namespace GuildFrontierSim.Application.Simulation
             PlanningSession.DelegateToCpu(decision, guildRevision);
         }
 
+        public void CancelTurnPlanning()
+        {
+            EnsureState(SimulationFlowState.PlanningTurn);
+            State = SimulationFlowState.Ready;
+            ClearCompletedTurn();
+        }
+
         public void ApplyTurnPlan(
             Func<TurnPlan, PendingExpeditionDecision> executor)
         {

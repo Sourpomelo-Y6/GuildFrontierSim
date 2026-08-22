@@ -188,30 +188,44 @@ namespace GuildFrontierSim.Editor
                 "Manual Planning Panel", typeof(RectTransform), typeof(Image));
             planningPanel.transform.SetParent(canvas.transform, false);
             planningPanel.GetComponent<Image>().color = new Color(0.09f, 0.13f, 0.19f, 0.96f);
-            SetRect((RectTransform)planningPanel.transform, 24, -600, 900, 285);
+            SetRect((RectTransform)planningPanel.transform, 24, -150, 1872, 820);
             Text planningStatus = CreateText(
-                planningPanel.transform, "Planning Status", string.Empty, 18);
-            SetRect(planningStatus.rectTransform, 16, -12, 868, 34);
-            Dropdown defenseDropdown = CreateDropdown(
-                planningPanel.transform, "Defense Selection", "防衛メンバー");
-            SetRect((RectTransform)defenseDropdown.transform, 16, -55, 250, 50);
+                planningPanel.transform, "Planning Status", string.Empty, 20);
+            SetRect(planningStatus.rectTransform, 24, -18, 1824, 40);
+            Text defenseCount = CreateText(
+                planningPanel.transform, "Defense Count", "防衛編成", 22);
+            SetRect(defenseCount.rectTransform, 24, -72, 620, 40);
             Toggle defenseCpu = CreateToggle(
                 planningPanel.transform, "Delegate Defense", "防衛をCPUへ");
-            SetRect((RectTransform)defenseCpu.transform, 280, -55, 180, 50);
-            Dropdown expeditionDropdown = CreateDropdown(
-                planningPanel.transform, "Expedition Selection", "遠征メンバー");
-            SetRect((RectTransform)expeditionDropdown.transform, 16, -115, 250, 50);
+            SetRect((RectTransform)defenseCpu.transform, 680, -68, 200, 50);
+            RectTransform defenseContainer = CreateListContainer(
+                planningPanel.transform, "Defense Member List");
+            SetRect(defenseContainer, 24, -122, 856, 330);
+            Text expeditionCount = CreateText(
+                planningPanel.transform, "Expedition Count", "遠征編成", 22);
+            SetRect(expeditionCount.rectTransform, 960, -72, 620, 40);
             Toggle expeditionCpu = CreateToggle(
                 planningPanel.transform, "Delegate Expedition", "遠征をCPUへ");
-            SetRect((RectTransform)expeditionCpu.transform, 280, -115, 180, 50);
+            SetRect((RectTransform)expeditionCpu.transform, 1640, -68, 200, 50);
+            RectTransform expeditionContainer = CreateListContainer(
+                planningPanel.transform, "Expedition Member List");
+            SetRect(expeditionContainer, 960, -122, 888, 330);
             Dropdown actingDropdown = CreateDropdown(
                 planningPanel.transform, "Acting Leader Selection", "代理リーダー");
-            SetRect((RectTransform)actingDropdown.transform, 16, -175, 250, 50);
+            SetRect((RectTransform)actingDropdown.transform, 24, -480, 320, 55);
             Toggle actingCpu = CreateToggle(
                 planningPanel.transform, "Delegate Acting Leader", "代理をCPUへ");
-            SetRect((RectTransform)actingCpu.transform, 280, -175, 180, 50);
-            Button applyPlan = CreateButton(planningPanel.transform, "Apply Turn Plan", "計画を確定");
-            SetRect((RectTransform)applyPlan.transform, 500, -55, 370, 170);
+            SetRect((RectTransform)actingCpu.transform, 370, -480, 200, 55);
+            Text planSummary = CreateText(
+                planningPanel.transform, "Plan Summary", string.Empty, 19);
+            SetRect(planSummary.rectTransform, 620, -470, 1228, 120);
+            Button cancelPlan = CreateButton(planningPanel.transform, "Cancel Turn Plan", "キャンセル");
+            SetRect((RectTransform)cancelPlan.transform, 24, -650, 280, 110);
+            Button delegateAll = CreateButton(planningPanel.transform, "Delegate All Decisions", "すべてCPUに任せる");
+            SetRect((RectTransform)delegateAll.transform, 330, -650, 440, 110);
+            Button applyPlan = CreateButton(
+                planningPanel.transform, "Apply Turn Plan", "この計画でターンを実行");
+            SetRect((RectTransform)applyPlan.transform, 800, -650, 1048, 110);
 
             SerializedObject viewSerialized = new SerializedObject(view);
             viewSerialized.FindProperty("controller").objectReferenceValue = controller;
@@ -231,13 +245,18 @@ namespace GuildFrontierSim.Editor
                 modeButton.GetComponentInChildren<Text>();
             manualSerialized.FindProperty("planningPanel").objectReferenceValue = planningPanel;
             manualSerialized.FindProperty("statusText").objectReferenceValue = planningStatus;
-            manualSerialized.FindProperty("defenseDropdown").objectReferenceValue = defenseDropdown;
+            manualSerialized.FindProperty("defenseMemberContainer").objectReferenceValue = defenseContainer;
+            manualSerialized.FindProperty("defenseCountText").objectReferenceValue = defenseCount;
             manualSerialized.FindProperty("delegateDefenseToggle").objectReferenceValue = defenseCpu;
-            manualSerialized.FindProperty("expeditionDropdown").objectReferenceValue = expeditionDropdown;
+            manualSerialized.FindProperty("expeditionMemberContainer").objectReferenceValue = expeditionContainer;
+            manualSerialized.FindProperty("expeditionCountText").objectReferenceValue = expeditionCount;
             manualSerialized.FindProperty("delegateExpeditionToggle").objectReferenceValue = expeditionCpu;
             manualSerialized.FindProperty("actingLeaderDropdown").objectReferenceValue = actingDropdown;
             manualSerialized.FindProperty("delegateActingLeaderToggle").objectReferenceValue = actingCpu;
+            manualSerialized.FindProperty("planSummaryText").objectReferenceValue = planSummary;
             manualSerialized.FindProperty("applyButton").objectReferenceValue = applyPlan;
+            manualSerialized.FindProperty("cancelButton").objectReferenceValue = cancelPlan;
+            manualSerialized.FindProperty("delegateAllButton").objectReferenceValue = delegateAll;
             manualSerialized.ApplyModifiedPropertiesWithoutUndo();
 
             GameObject decisionPanel = new GameObject(
@@ -443,6 +462,25 @@ namespace GuildFrontierSim.Editor
             dropdown.itemText = itemText;
             template.SetActive(false);
             return dropdown;
+        }
+
+        private static RectTransform CreateListContainer(Transform parent, string name)
+        {
+            GameObject gameObject = new GameObject(
+                name,
+                typeof(RectTransform),
+                typeof(Image),
+                typeof(VerticalLayoutGroup));
+            gameObject.transform.SetParent(parent, false);
+            gameObject.GetComponent<Image>().color = new Color(0.07f, 0.1f, 0.15f, 1f);
+            VerticalLayoutGroup layout = gameObject.GetComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(8, 8, 8, 8);
+            layout.spacing = 6f;
+            layout.childControlWidth = true;
+            layout.childControlHeight = false;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            return (RectTransform)gameObject.transform;
         }
 
         private static void SetRect(

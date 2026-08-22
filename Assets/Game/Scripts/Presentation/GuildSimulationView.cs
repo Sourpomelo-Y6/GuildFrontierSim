@@ -69,8 +69,11 @@ namespace GuildFrontierSim.Presentation
             membersText.text = BuildMembers(guild);
             expeditionsText.text = BuildExpeditions(guild);
             logText.text = BuildLogs(controller.Simulation);
-            advanceTurnButton.interactable = !controller.IsManualMode ||
-                controller.FlowController.State == SimulationFlowState.Ready;
+            bool ready = controller.FlowController.State == SimulationFlowState.Ready;
+            advanceTurnButton.interactable = !controller.IsManualMode || ready;
+            advanceTurnButton.GetComponentInChildren<Text>().text = controller.IsManualMode
+                ? (ready ? "ターン計画を始める" : "計画入力中")
+                : "次のターン";
         }
 
         private void OnAdvanceTurnClicked()

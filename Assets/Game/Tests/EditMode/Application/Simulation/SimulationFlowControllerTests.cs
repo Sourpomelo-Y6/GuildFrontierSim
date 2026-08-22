@@ -62,6 +62,23 @@ namespace GuildFrontierSim.Tests.Application.Simulation
         }
 
         [Test]
+        public void CancelTurnPlanning_ReturnsReadyWithoutAdvancingGuild()
+        {
+            GuildRuntimeData guild = Guild(Character("leader", isPlayer: true));
+            var controller = new SimulationFlowController(
+                guild,
+                new GuildControlPolicy(GuildControlMode.Player, "leader"));
+            controller.BeginTurnPlanning(requiresDefense: true, requiresExpedition: true);
+
+            controller.CancelTurnPlanning();
+
+            Assert.That(controller.State, Is.EqualTo(SimulationFlowState.Ready));
+            Assert.That(controller.PlanningSession, Is.Null);
+            Assert.That(guild.CurrentTurn, Is.Zero);
+            Assert.That(guild.Revision, Is.Zero);
+        }
+
+        [Test]
         public void SubmitDecision_WithStaleRevision_IsRejectedWithoutMutation()
         {
             GuildRuntimeData guild = Guild(Character("leader", isPlayer: true));

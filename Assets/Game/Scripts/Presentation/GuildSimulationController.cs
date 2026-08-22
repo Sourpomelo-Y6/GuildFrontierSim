@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using GuildFrontierSim.Application.Factories;
 using GuildFrontierSim.Application.Simulation;
 using GuildFrontierSim.Application.Assignments.Defense;
@@ -37,6 +38,8 @@ namespace GuildFrontierSim.Presentation
         public SimulationFlowController FlowController { get; private set; }
         public TurnPlanningRequirements ManualRequirements { get; private set; }
         public string LastError { get; private set; } = string.Empty;
+        public int DesiredDefenseMembers => cpuSelectionSettings.DesiredDefenseMembers;
+        public int DesiredExpeditionMembers => cpuSelectionSettings.DesiredExpeditionMembers;
         private TurnPlan pendingTurnPlan;
 
         private void Start()
@@ -137,6 +140,27 @@ namespace GuildFrontierSim.Presentation
             string actingLeaderCharacterId,
             bool delegateActingLeader)
         {
+            return ApplyManualSelections(
+                string.IsNullOrWhiteSpace(defenseCharacterId)
+                    ? Array.Empty<string>()
+                    : new[] { defenseCharacterId },
+                delegateDefense,
+                string.IsNullOrWhiteSpace(expeditionCharacterId)
+                    ? Array.Empty<string>()
+                    : new[] { expeditionCharacterId },
+                delegateExpedition,
+                actingLeaderCharacterId,
+                delegateActingLeader);
+        }
+
+        public bool ApplyManualSelections(
+            IEnumerable<string> defenseCharacterIds,
+            bool delegateDefense,
+            IEnumerable<string> expeditionCharacterIds,
+            bool delegateExpedition,
+            string actingLeaderCharacterId,
+            bool delegateActingLeader)
+        {
             if (FlowController == null ||
                 FlowController.State != SimulationFlowState.PlanningTurn)
                 return false;
@@ -153,7 +177,7 @@ namespace GuildFrontierSim.Presentation
                         FlowController.SubmitDefense(
                             new DefenseAssignment(
                                 simulationSettings.DefenseEnemyBasePower,
-                                new[] { defenseCharacterId }),
+                                defenseCharacterIds),
                             revision);
                 }
 
@@ -167,7 +191,7 @@ namespace GuildFrontierSim.Presentation
                             new ExpeditionAssignment(
                                 $"expedition-{session.TargetTurn}",
                                 expeditionArea.Id,
-                                new[] { expeditionCharacterId }),
+                                expeditionCharacterIds),
                             revision);
                 }
 
@@ -211,6 +235,18 @@ namespace GuildFrontierSim.Presentation
                 ManualPlanningChanged?.Invoke();
                 return false;
             }
+        }
+
+        public bool CancelManualPlanning()
+        {
+            if (FlowController == null ||
+                FlowController.State != SimulationFlowState.PlanningTurn)
+                return false;
+            FlowController.CancelTurnPlanning();
+            ManualRequirements = null;
+            LastError = string.Empty;
+            ManualPlanningChanged?.Invoke();
+            return true;
         }
 
         public bool ApplyManualExpeditionDecision(ExpeditionDecision decision)

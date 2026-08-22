@@ -79,12 +79,13 @@ Unity Hubから上記のUnity Editorバージョンをインストールして�
 4. Package Managerによるパッケージ復元と、初回インポートの完了を待ちます。
 5. `Assets/Scenes/MainScene.unity` を開きます。
 6. Unityの再生ボタンを押します。
-7. 画面の「次のターン」を押してシミュレーションを進めます。「最初から」で初期状態へ戻せます。
+7. CPU経営では「次のターン」で自動進行します。手動経営では「ターン計画を始める」を押し、防衛・遠征メンバーをチェックボックスで複数選択してから「この計画でターンを実行」を押します。
+8. 計画を取り消す場合は「キャンセル」、判断を省略する場合は「すべてCPUに任せる」を使用します。「最初から」で初期状態へ戻せます。
 
 ### テストと開発ビルド
 
-- EditModeテスト: 136件
-- PlayModeテスト: 1件（実シーンのターン進行とリセット）
+- EditModeテスト: 183件
+- PlayModeテスト: 2件（CPU進行、複数人編成、計画キャンセル、遠征判断）
 - Windows 64-bit Development Build: 作成・起動確認済み
 
 Unity Editorメニューの`Guild Frontier Sim > Build Windows Development Player`から、`Builds/Windows`へ開発ビルドを生成できます。`Builds`フォルダはGit管理対象外です。

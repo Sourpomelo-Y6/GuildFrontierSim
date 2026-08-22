@@ -53,37 +53,65 @@ namespace GuildFrontierSim.Tests.PlayMode
             Button modeButton = GameObject.Find("Management Mode").GetComponent<Button>();
             Button advanceButton = GameObject.Find("Advance Turn").GetComponent<Button>();
             Button applyButton = GameObject.Find("Apply Turn Plan").GetComponent<Button>();
-            Dropdown expeditionDropdown =
-                GameObject.Find("Expedition Selection").GetComponent<Dropdown>();
             Text status = GameObject.Find("Planning Status").GetComponent<Text>();
 
             modeButton.onClick.Invoke();
             yield return null;
             Assert.That(controller.IsManualMode, Is.True);
+            Assert.That(
+                advanceButton.GetComponentInChildren<Text>().text,
+                Is.EqualTo("ターン計画を始める"));
 
             advanceButton.onClick.Invoke();
             yield return null;
             Assert.That(controller.FlowController.State,
                 Is.EqualTo(SimulationFlowState.PlanningTurn));
-            Assert.That(expeditionDropdown.interactable, Is.True);
-            Assert.That(expeditionDropdown.options, Has.Count.GreaterThan(0));
-            Assert.That(status.text, Does.Contain("遠征"));
+            Assert.That(GameObject.Find("Manual Planning Panel").activeSelf, Is.True);
+            Assert.That(
+                applyButton.GetComponentInChildren<Text>().text,
+                Is.EqualTo("この計画でターンを実行"));
+            GameObject.Find("Cancel Turn Plan").GetComponent<Button>().onClick.Invoke();
+            yield return null;
+            Assert.That(controller.FlowController.State, Is.EqualTo(SimulationFlowState.Ready));
+            Assert.That(controller.Guild.CurrentTurn, Is.Zero);
+
+            advanceButton.onClick.Invoke();
+            yield return null;
+            Transform expeditionList = GameObject.Find("Expedition Member List").transform;
+            Assert.That(expeditionList.childCount, Is.EqualTo(4));
+            for (int index = 0; index < 3; index++)
+                expeditionList.GetChild(index).GetComponent<Toggle>().isOn = true;
+            Assert.That(status.text, Does.Contain("複数選択"));
+            Assert.That(
+                GameObject.Find("Expedition Count").GetComponent<Text>().text,
+                Does.Contain("3/3人"));
 
             applyButton.onClick.Invoke();
             yield return null;
 
             Assert.That(controller.Guild.CurrentTurn, Is.EqualTo(1));
             Assert.That(controller.Guild.Expeditions, Has.Count.EqualTo(1));
+            Assert.That(controller.Guild.Expeditions[0].ParticipantIds, Has.Count.EqualTo(3));
             Assert.That(controller.FlowController.State,
                 Is.EqualTo(SimulationFlowState.Ready));
             Assert.That(controller.LastError, Is.Empty);
 
             advanceButton.onClick.Invoke();
             yield return null;
-            Dropdown defenseDropdown =
-                GameObject.Find("Defense Selection").GetComponent<Dropdown>();
-            Assert.That(defenseDropdown.interactable, Is.True);
-            string selectedDefender = defenseDropdown.options[defenseDropdown.value].text;
+            Transform defenseList = GameObject.Find("Defense Member List").transform;
+            Toggle selectedDefenseToggle = null;
+            for (int index = 0; index < defenseList.childCount; index++)
+            {
+                Toggle candidate = defenseList.GetChild(index).GetComponent<Toggle>();
+                if (candidate.interactable)
+                {
+                    selectedDefenseToggle = candidate;
+                    candidate.isOn = true;
+                    break;
+                }
+            }
+            Assert.That(selectedDefenseToggle, Is.Not.Null);
+            string selectedDefender = selectedDefenseToggle.gameObject.name;
 
             applyButton.onClick.Invoke();
             yield return null;

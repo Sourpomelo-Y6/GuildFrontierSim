@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using GuildFrontierSim.Application.Simulation;
 using GuildFrontierSim.Domain.Characters;
@@ -14,26 +15,37 @@ namespace GuildFrontierSim.Presentation
         [SerializeField] private Text modeButtonText;
         [SerializeField] private GameObject planningPanel;
         [SerializeField] private Text statusText;
-        [SerializeField] private Dropdown defenseDropdown;
+        [SerializeField] private RectTransform defenseMemberContainer;
+        [SerializeField] private Text defenseCountText;
         [SerializeField] private Toggle delegateDefenseToggle;
-        [SerializeField] private Dropdown expeditionDropdown;
+        [SerializeField] private RectTransform expeditionMemberContainer;
+        [SerializeField] private Text expeditionCountText;
         [SerializeField] private Toggle delegateExpeditionToggle;
         [SerializeField] private Dropdown actingLeaderDropdown;
         [SerializeField] private Toggle delegateActingLeaderToggle;
+        [SerializeField] private Text planSummaryText;
         [SerializeField] private Button applyButton;
+        [SerializeField] private Button cancelButton;
+        [SerializeField] private Button delegateAllButton;
+
+        private readonly Dictionary<string, Toggle> defenseToggles = new Dictionary<string, Toggle>(StringComparer.Ordinal);
+        private readonly Dictionary<string, Toggle> expeditionToggles = new Dictionary<string, Toggle>(StringComparer.Ordinal);
+        private bool changingSelection;
 
         private void Start()
         {
             modeButton.onClick.AddListener(OnModeClicked);
             applyButton.onClick.AddListener(OnApplyClicked);
+            cancelButton.onClick.AddListener(OnCancelClicked);
+            delegateAllButton.onClick.AddListener(OnDelegateAllClicked);
+            delegateDefenseToggle.onValueChanged.AddListener(_ => UpdateDisplay());
+            delegateExpeditionToggle.onValueChanged.AddListener(_ => UpdateDisplay());
             controller.ManualPlanningChanged += Refresh;
             Refresh();
         }
 
         private void OnDestroy()
         {
-            if (modeButton != null) modeButton.onClick.RemoveListener(OnModeClicked);
-            if (applyButton != null) applyButton.onClick.RemoveListener(OnApplyClicked);
             if (controller != null) controller.ManualPlanningChanged -= Refresh;
         }
 
@@ -41,26 +53,22 @@ namespace GuildFrontierSim.Presentation
         {
             if (controller == null || controller.Guild == null) return;
             modeButtonText.text = controller.IsManualMode ? "手動経営" : "CPU経営";
-            modeButton.interactable = controller.FlowController == null ||
-                (controller.FlowController.State != SimulationFlowState.ApplyingTurn &&
-                 controller.FlowController.State !=
-                    SimulationFlowState.WaitingForExpeditionDecision);
-            bool isPlanning = controller.IsManualMode &&
-                controller.FlowController != null &&
-                controller.FlowController.State == SimulationFlowState.PlanningTurn;
-            planningPanel.SetActive(controller.IsManualMode);
-            PopulateMembers(controller.Guild);
-            SetControls(isPlanning);
+            SimulationFlowState state = controller.FlowController?.State ?? SimulationFlowState.Ready;
+            modeButton.interactable = state == SimulationFlowState.Ready;
+            bool isPlanning = controller.IsManualMode && state == SimulationFlowState.PlanningTurn;
+            planningPanel.SetActive(isPlanning);
+            if (!isPlanning) return;
 
-            if (!string.IsNullOrEmpty(controller.LastError))
-                statusText.text = $"エラー: {controller.LastError}";
-            else if (!isPlanning)
-                statusText.text = controller.FlowController.State ==
-                    SimulationFlowState.WaitingForExpeditionDecision
-                    ? "遠征結果の判断待ちです。"
-                    : "「次のターン」で計画を開始します。";
-            else
-                statusText.text = BuildRequirementText(controller.ManualRequirements);
+            BuildMemberToggles(controller.Guild);
+            PopulateActingLeaders(controller.Guild);
+            delegateDefenseToggle.interactable = controller.ManualRequirements.RequiresDefense;
+            delegateExpeditionToggle.interactable = controller.ManualRequirements.RequiresExpedition;
+            actingLeaderDropdown.interactable = controller.ManualRequirements.RequiresActingLeader;
+            delegateActingLeaderToggle.interactable = actingLeaderDropdown.interactable;
+            statusText.text = string.IsNullOrEmpty(controller.LastError)
+                ? "メンバーを複数選択し、内容を確認してターンを実行してください。"
+                : $"エラー: {controller.LastError}";
+            UpdateDisplay();
         }
 
         private void OnModeClicked()
@@ -72,81 +80,204 @@ namespace GuildFrontierSim.Presentation
         private void OnApplyClicked()
         {
             controller.ApplyManualSelections(
-                SelectedId(defenseDropdown),
-                delegateDefenseToggle.isOn,
-                SelectedId(expeditionDropdown),
-                delegateExpeditionToggle.isOn,
-                SelectedId(actingLeaderDropdown),
-                delegateActingLeaderToggle.isOn);
+                SelectedIds(defenseToggles), delegateDefenseToggle.isOn,
+                SelectedIds(expeditionToggles), delegateExpeditionToggle.isOn,
+                SelectedId(actingLeaderDropdown), delegateActingLeaderToggle.isOn);
             Refresh();
         }
 
-        private void PopulateMembers(GuildRuntimeData guild)
+        private void OnCancelClicked()
         {
-            var assignable = new List<string>();
-            var acting = new List<string>();
+            controller.CancelManualPlanning();
+            Refresh();
+        }
+
+        private void OnDelegateAllClicked()
+        {
+            controller.ApplyManualSelections(
+                Array.Empty<string>(), true,
+                Array.Empty<string>(), true,
+                string.Empty, true);
+            Refresh();
+        }
+
+        private void BuildMemberToggles(GuildRuntimeData guild)
+        {
+            var selectedDefense = new HashSet<string>(SelectedIds(defenseToggles), StringComparer.Ordinal);
+            var selectedExpedition = new HashSet<string>(SelectedIds(expeditionToggles), StringComparer.Ordinal);
+            ClearContainer(defenseMemberContainer);
+            ClearContainer(expeditionMemberContainer);
+            defenseToggles.Clear();
+            expeditionToggles.Clear();
             for (int index = 0; index < guild.Characters.Count; index++)
             {
                 CharacterRuntimeData character = guild.Characters[index];
-                if (!CharacterAvailability.CanBeAssigned(character)) continue;
-                assignable.Add(character.CharacterId);
-                if (character.CharacterId != guild.LeaderCharacterId)
-                    acting.Add(character.CharacterId);
+                defenseToggles.Add(character.CharacterId,
+                    CreateMemberToggle(defenseMemberContainer, character, true));
+                expeditionToggles.Add(character.CharacterId,
+                    CreateMemberToggle(expeditionMemberContainer, character, false));
             }
-            ReplaceOptions(defenseDropdown, assignable);
-            ReplaceOptions(expeditionDropdown, assignable);
-            ReplaceOptions(actingLeaderDropdown, acting);
+            changingSelection = true;
+            foreach (string id in selectedDefense)
+                if (defenseToggles.TryGetValue(id, out Toggle defenseToggle)) defenseToggle.isOn = true;
+            foreach (string id in selectedExpedition)
+                if (expeditionToggles.TryGetValue(id, out Toggle expeditionToggle)) expeditionToggle.isOn = true;
+            changingSelection = false;
         }
 
-        private void SetControls(bool isPlanning)
+        private Toggle CreateMemberToggle(RectTransform parent, CharacterRuntimeData character, bool defense)
         {
-            TurnPlanningRequirements requirements = controller.ManualRequirements;
-            if (requirements == null)
+            GameObject row = new GameObject(character.CharacterId, typeof(RectTransform), typeof(Image), typeof(Toggle));
+            row.transform.SetParent(parent, false);
+            ((RectTransform)row.transform).sizeDelta = new Vector2(0f, 54f);
+            row.GetComponent<Image>().color = new Color(0.12f, 0.18f, 0.26f, 1f);
+            Toggle toggle = row.GetComponent<Toggle>();
+            toggle.targetGraphic = row.GetComponent<Image>();
+            GameObject check = new GameObject("Selected", typeof(RectTransform), typeof(Image));
+            check.transform.SetParent(row.transform, false);
+            RectTransform checkRect = (RectTransform)check.transform;
+            checkRect.anchorMin = new Vector2(0f, 0f);
+            checkRect.anchorMax = new Vector2(0f, 1f);
+            checkRect.sizeDelta = new Vector2(8f, 0f);
+            checkRect.anchoredPosition = new Vector2(4f, 0f);
+            check.GetComponent<Image>().color = new Color(0.2f, 0.75f, 1f, 1f);
+            toggle.graphic = check.GetComponent<Image>();
+            Text label = CreateRuntimeText(row.transform, 16);
+            label.text = BuildMemberLabel(character);
+            label.rectTransform.offsetMin = new Vector2(18f, 2f);
+            label.rectTransform.offsetMax = new Vector2(-6f, -2f);
+            toggle.interactable = CharacterAvailability.CanBeAssigned(character);
+            toggle.onValueChanged.AddListener(selected =>
+                OnMemberSelectionChanged(character.CharacterId, defense, selected));
+            return toggle;
+        }
+
+        private void OnMemberSelectionChanged(string id, bool defense, bool selected)
+        {
+            if (changingSelection) return;
+            changingSelection = true;
+            try
             {
-                defenseDropdown.interactable = false;
-                delegateDefenseToggle.interactable = false;
-                expeditionDropdown.interactable = false;
-                delegateExpeditionToggle.interactable = false;
-                actingLeaderDropdown.interactable = false;
-                delegateActingLeaderToggle.interactable = false;
-                applyButton.interactable = false;
-                return;
+                Dictionary<string, Toggle> own = defense ? defenseToggles : expeditionToggles;
+                Dictionary<string, Toggle> other = defense ? expeditionToggles : defenseToggles;
+                int limit = defense ? controller.DesiredDefenseMembers : controller.DesiredExpeditionMembers;
+                if (selected && CountSelected(own) > limit) own[id].isOn = false;
+                else if (selected && other.TryGetValue(id, out Toggle otherToggle)) otherToggle.isOn = false;
             }
-            defenseDropdown.interactable = isPlanning && requirements.RequiresDefense;
-            delegateDefenseToggle.interactable = defenseDropdown.interactable;
-            expeditionDropdown.interactable = isPlanning && requirements.RequiresExpedition;
-            delegateExpeditionToggle.interactable = expeditionDropdown.interactable;
-            actingLeaderDropdown.interactable = isPlanning && requirements.RequiresActingLeader;
-            delegateActingLeaderToggle.interactable = actingLeaderDropdown.interactable;
-            applyButton.interactable = isPlanning;
+            finally { changingSelection = false; }
+            UpdateDisplay();
         }
 
-        private static string BuildRequirementText(TurnPlanningRequirements requirements)
+        private void UpdateDisplay()
         {
-            var items = new List<string>();
-            if (requirements.RequiresDefense) items.Add("防衛");
-            if (requirements.RequiresExpedition) items.Add("遠征");
-            if (requirements.RequiresActingLeader) items.Add("代理リーダー");
-            return items.Count == 0
-                ? "判断項目はありません。計画を確定できます。"
-                : $"入力待ち: {string.Join(" / ", items)}";
+            if (!planningPanel.activeSelf) return;
+            bool defenseRequired = controller.ManualRequirements.RequiresDefense;
+            bool expeditionRequired = controller.ManualRequirements.RequiresExpedition;
+            SetMemberInteractability(
+                defenseToggles,
+                defenseRequired && !delegateDefenseToggle.isOn);
+            SetMemberInteractability(
+                expeditionToggles,
+                expeditionRequired && !delegateExpeditionToggle.isOn);
+            defenseCountText.text = controller.ManualRequirements.RequiresDefense
+                ? $"防衛編成  {CountSelected(defenseToggles)}/{controller.DesiredDefenseMembers}人"
+                : "防衛イベントなし";
+            expeditionCountText.text = controller.ManualRequirements.RequiresExpedition
+                ? $"遠征編成  {CountSelected(expeditionToggles)}/{controller.DesiredExpeditionMembers}人"
+                : "新規遠征なし";
+            planSummaryText.text =
+                $"防衛: {Summary(defenseToggles, delegateDefenseToggle.isOn)}\n" +
+                $"遠征: {Summary(expeditionToggles, delegateExpeditionToggle.isOn)}\n" +
+                "遠征先: Whispering Forest  敵戦闘力 35";
+            bool defenseReady = !defenseRequired || delegateDefenseToggle.isOn ||
+                CountSelected(defenseToggles) > 0;
+            bool expeditionReady = !expeditionRequired || delegateExpeditionToggle.isOn ||
+                CountSelected(expeditionToggles) > 0;
+            bool actingReady = !controller.ManualRequirements.RequiresActingLeader ||
+                delegateActingLeaderToggle.isOn || actingLeaderDropdown.options.Count > 0;
+            applyButton.interactable = defenseReady && expeditionReady && actingReady;
         }
 
-        private static void ReplaceOptions(Dropdown dropdown, List<string> ids)
+        private void PopulateActingLeaders(GuildRuntimeData guild)
         {
-            string selected = SelectedId(dropdown);
-            dropdown.ClearOptions();
-            dropdown.AddOptions(ids);
-            int index = ids.IndexOf(selected);
-            dropdown.value = index < 0 ? 0 : index;
-            dropdown.RefreshShownValue();
+            actingLeaderDropdown.ClearOptions();
+            var ids = new List<string>();
+            for (int index = 0; index < guild.Characters.Count; index++)
+            {
+                CharacterRuntimeData character = guild.Characters[index];
+                if (character.CharacterId != guild.LeaderCharacterId && CharacterAvailability.CanBeAssigned(character))
+                    ids.Add(character.CharacterId);
+            }
+            actingLeaderDropdown.AddOptions(ids);
+        }
+
+        private static string BuildMemberLabel(CharacterRuntimeData character)
+        {
+            string reason = CharacterAvailability.CanBeAssigned(character)
+                ? string.Empty : $"  [選択不可: {character.Status}]";
+            return $"{character.CharacterId}  HP {character.CurrentHp}/{character.MaxHp}" +
+                   $"  攻{character.Attack} 防{character.Defense}  {character.Status}{reason}";
+        }
+
+        private void SetMemberInteractability(
+            Dictionary<string, Toggle> toggles,
+            bool decisionEnabled)
+        {
+            foreach (KeyValuePair<string, Toggle> pair in toggles)
+            {
+                pair.Value.interactable = decisionEnabled &&
+                    controller.Guild.TryGetCharacter(pair.Key, out CharacterRuntimeData character) &&
+                    CharacterAvailability.CanBeAssigned(character);
+            }
+        }
+
+        private static Text CreateRuntimeText(Transform parent, int size)
+        {
+            GameObject gameObject = new GameObject("Member", typeof(RectTransform), typeof(Text));
+            gameObject.transform.SetParent(parent, false);
+            RectTransform rect = (RectTransform)gameObject.transform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+            Text text = gameObject.GetComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.fontSize = size;
+            text.color = Color.white;
+            text.alignment = TextAnchor.MiddleLeft;
+            return text;
+        }
+
+        private static void ClearContainer(RectTransform container)
+        {
+            for (int index = container.childCount - 1; index >= 0; index--)
+                Destroy(container.GetChild(index).gameObject);
+        }
+
+        private static int CountSelected(Dictionary<string, Toggle> toggles)
+        {
+            int count = 0;
+            foreach (Toggle toggle in toggles.Values) if (toggle.isOn) count++;
+            return count;
+        }
+
+        private static List<string> SelectedIds(Dictionary<string, Toggle> toggles)
+        {
+            var ids = new List<string>();
+            foreach (KeyValuePair<string, Toggle> pair in toggles)
+                if (pair.Value.isOn) ids.Add(pair.Key);
+            return ids;
+        }
+
+        private static string Summary(Dictionary<string, Toggle> toggles, bool delegated)
+        {
+            if (delegated) return "CPUに任せる";
+            List<string> ids = SelectedIds(toggles);
+            return ids.Count == 0 ? "選択なし" : string.Join(", ", ids);
         }
 
         private static string SelectedId(Dropdown dropdown)
         {
-            return dropdown.options.Count == 0
-                ? string.Empty
-                : dropdown.options[dropdown.value].text;
+            return dropdown.options.Count == 0 ? string.Empty : dropdown.options[dropdown.value].text;
         }
     }
 }
