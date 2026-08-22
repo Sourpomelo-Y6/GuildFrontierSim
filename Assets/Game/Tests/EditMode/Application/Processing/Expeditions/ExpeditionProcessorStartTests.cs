@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using GuildFrontierSim.Application.Assignments.Expeditions;
 using GuildFrontierSim.Application.Processing.Expeditions;
 using GuildFrontierSim.Data.Definitions;
 using GuildFrontierSim.Data.Settings;
@@ -170,6 +171,70 @@ namespace GuildFrontierSim.Tests.Application.Processing.Expeditions
             finally
             {
                 TestAssetFactory.Destroy(area, selectionSettings, battleSettings);
+            }
+        }
+
+        [Test]
+        public void Start_WithExplicitAssignment_UsesOnlyRequestedMembersAndArea()
+        {
+            CharacterRuntimeData strongest = CreateCharacter("strongest", 100);
+            CharacterRuntimeData requested = CreateCharacter("requested", 10);
+            CharacterRuntimeData reserve = CreateCharacter("reserve", 5);
+            GuildRuntimeData guild = CreateGuild(strongest, requested, reserve);
+            ExpeditionAreaDefinition forest = TestAssetFactory.CreateExpeditionArea("forest");
+            ExpeditionAreaDefinition ruins = TestAssetFactory.CreateExpeditionArea(
+                "ruins", enemyPower: 250, maximumStages: 5);
+            CpuSelectionSettings settings = TestAssetFactory.CreateCpuSelectionSettings(
+                desiredExpeditionMembers: 1,
+                minimumGuildMembersRemaining: 1);
+
+            try
+            {
+                ExpeditionStartResult result = new ExpeditionProcessor().Start(
+                    guild,
+                    new ExpeditionAssignment("manual-1", "ruins", new[] { "requested" }),
+                    new ExpeditionAreaRegistry(new[] { forest, ruins }),
+                    settings);
+
+                Assert.That(result.ParticipantIds, Is.EqualTo(new[] { "requested" }));
+                Assert.That(result.Expedition.AreaId, Is.EqualTo("ruins"));
+                Assert.That(result.Expedition.EnemyBasePower, Is.EqualTo(250f));
+                Assert.That(strongest.Status, Is.EqualTo(CharacterStatus.Available));
+                Assert.That(requested.Status, Is.EqualTo(CharacterStatus.Expedition));
+            }
+            finally
+            {
+                TestAssetFactory.Destroy(forest, ruins, settings);
+            }
+        }
+
+        [Test]
+        public void Start_WithDefenseOverlap_RejectsBeforeChangingState()
+        {
+            CharacterRuntimeData member = CreateCharacter("member");
+            CharacterRuntimeData reserve = CreateCharacter("reserve");
+            GuildRuntimeData guild = CreateGuild(member, reserve);
+            ExpeditionAreaDefinition area = TestAssetFactory.CreateExpeditionArea("forest");
+            CpuSelectionSettings settings = TestAssetFactory.CreateCpuSelectionSettings(
+                desiredExpeditionMembers: 1,
+                minimumGuildMembersRemaining: 1);
+
+            try
+            {
+                Assert.Throws<InvalidOperationException>(() =>
+                    new ExpeditionProcessor().Start(
+                        guild,
+                        new ExpeditionAssignment("manual-1", "forest", new[] { "member" }),
+                        new ExpeditionAreaRegistry(new[] { area }),
+                        settings,
+                        new[] { "member" }));
+
+                Assert.That(member.Status, Is.EqualTo(CharacterStatus.Available));
+                Assert.That(guild.Expeditions, Is.Empty);
+            }
+            finally
+            {
+                TestAssetFactory.Destroy(area, settings);
             }
         }
 

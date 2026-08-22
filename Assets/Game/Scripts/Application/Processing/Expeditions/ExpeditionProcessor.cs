@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GuildFrontierSim.Application.Assignments.Expeditions;
 using GuildFrontierSim.Application.Selection;
 using GuildFrontierSim.Data.Definitions;
 using GuildFrontierSim.Data.Settings;
@@ -12,10 +13,15 @@ namespace GuildFrontierSim.Application.Processing.Expeditions
     public sealed class ExpeditionProcessor
     {
         private readonly CpuMemberSelector memberSelector;
+        private readonly ExpeditionAssignmentValidator assignmentValidator;
 
-        public ExpeditionProcessor(CpuMemberSelector memberSelector = null)
+        public ExpeditionProcessor(
+            CpuMemberSelector memberSelector = null,
+            ExpeditionAssignmentValidator assignmentValidator = null)
         {
             this.memberSelector = memberSelector ?? new CpuMemberSelector();
+            this.assignmentValidator = assignmentValidator ??
+                new ExpeditionAssignmentValidator();
         }
 
         public ExpeditionStartResult Start(
@@ -44,19 +50,82 @@ namespace GuildFrontierSim.Application.Processing.Expeditions
                 selectionSettings,
                 battleSettings);
 
-            if (selection.SelectedMembers.Count == 0)
+            var participantIds = new List<string>(selection.SelectedMembers.Count);
+            for (int index = 0; index < selection.SelectedMembers.Count; index++)
+            {
+                participantIds.Add(selection.SelectedMembers[index].CharacterId);
+            }
+
+            return Start(
+                guild,
+                new ExpeditionAssignment(
+                    request.ExpeditionId,
+                    request.Area.Id,
+                    participantIds),
+                new ExpeditionAreaRegistry(new[] { request.Area }),
+                selectionSettings);
+        }
+
+        public ExpeditionStartResult Start(
+            GuildRuntimeData guild,
+            ExpeditionAssignment assignment,
+            ExpeditionAreaRegistry areaRegistry,
+            CpuSelectionSettings selectionSettings,
+            IEnumerable<string> defenseCharacterIds = null)
+        {
+            if (guild == null) throw new ArgumentNullException(nameof(guild));
+            if (assignment == null) throw new ArgumentNullException(nameof(assignment));
+
+            ExpeditionAssignmentValidationResult validation = assignmentValidator.Validate(
+                guild,
+                assignment,
+                areaRegistry,
+                selectionSettings,
+                defenseCharacterIds);
+            if (!validation.IsValid)
+            {
+                if (validation.Error ==
+                    ExpeditionAssignmentValidationError.DuplicateExpeditionId)
+                {
+                    throw new ArgumentException(
+                        "An expedition with the same ID already exists.",
+                        nameof(assignment));
+                }
+
+                throw new InvalidOperationException(
+                    $"Invalid expedition assignment: {validation.Error} ({validation.SubjectId}).");
+            }
+
+            ValidateArea(validation.Area);
+            return StartValidated(
+                guild,
+                assignment.ExpeditionId,
+                validation.Area,
+                validation.Participants,
+                selectionSettings.DesiredExpeditionMembers);
+        }
+
+        private static ExpeditionStartResult StartValidated(
+            GuildRuntimeData guild,
+            string expeditionId,
+            ExpeditionAreaDefinition area,
+            IReadOnlyList<CharacterRuntimeData> participants,
+            int requestedMemberCount)
+        {
+
+            if (participants.Count == 0)
             {
                 return new ExpeditionStartResult(
                     ExpeditionStartOutcome.NoMembersAvailable,
                     null,
                     Array.Empty<string>(),
-                    selection.RequestedCount);
+                    requestedMemberCount);
             }
 
-            var participantIds = new List<string>(selection.SelectedMembers.Count);
-            for (int index = 0; index < selection.SelectedMembers.Count; index++)
+            var participantIds = new List<string>(participants.Count);
+            for (int index = 0; index < participants.Count; index++)
             {
-                CharacterRuntimeData participant = selection.SelectedMembers[index];
+                CharacterRuntimeData participant = participants[index];
                 participantIds.Add(participant.CharacterId);
                 participant.SetStatus(CharacterStatus.Expedition);
             }
@@ -64,24 +133,24 @@ namespace GuildFrontierSim.Application.Processing.Expeditions
             try
             {
                 var expedition = new ExpeditionRuntimeData(
-                    request.ExpeditionId,
-                    request.Area.Id,
+                    expeditionId,
+                    area.Id,
                     participantIds,
-                    request.Area.EnemyPower,
-                    request.Area.MaximumStages,
-                    request.Area.RewardMultiplier,
-                    request.Area.CanContainCaptives);
+                    area.EnemyPower,
+                    area.MaximumStages,
+                    area.RewardMultiplier,
+                    area.CanContainCaptives);
                 guild.AddExpedition(expedition);
 
                 return new ExpeditionStartResult(
                     ExpeditionStartOutcome.Started,
                     expedition,
                     participantIds,
-                    selection.RequestedCount);
+                    requestedMemberCount);
             }
             catch
             {
-                RestoreParticipants(selection.SelectedMembers);
+                RestoreParticipants(participants);
                 throw;
             }
         }

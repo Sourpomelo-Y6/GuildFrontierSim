@@ -407,7 +407,7 @@ Presentation/
 
 ### Step 10C: 明示的な遠征開始
 
-- 状態: 次の実装対象
+- 状態: 完了
 - `ExpeditionAssignment`
 - 遠征先登録とValidator
 - `ExpeditionProcessor`の明示参加者経路
@@ -415,6 +415,7 @@ Presentation/
 
 ### Step 10D: 操作主体とターン計画
 
+- 状態: 次の実装対象
 - `GuildControlMode`
 - `GuildControlPolicy`
 - `TurnPlanningSession`
