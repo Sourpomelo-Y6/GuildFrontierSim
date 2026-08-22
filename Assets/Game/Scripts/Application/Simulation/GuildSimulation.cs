@@ -99,6 +99,7 @@ namespace GuildFrontierSim.Application.Simulation
             {
                 ExpeditionStatus status = Guild.Expeditions[index].Status;
                 if (status == ExpeditionStatus.Active ||
+                    status == ExpeditionStatus.AwaitingDecision ||
                     status == ExpeditionStatus.Returning)
                 {
                     return true;

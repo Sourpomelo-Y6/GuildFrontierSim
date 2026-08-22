@@ -33,6 +33,26 @@ namespace GuildFrontierSim.Application.Processing.Expeditions.Stages
             BattleBalanceSettings battleSettings,
             ExpeditionBalanceSettings expeditionSettings)
         {
+            ExpeditionStageResolution resolution = ResolveStageBattle(
+                guild,
+                expeditionId,
+                battleSettings,
+                expeditionSettings);
+            return resolution.IsWaitingForDecision
+                ? ApplyDecision(
+                    guild,
+                    resolution.PendingDecision,
+                    ExpeditionDecision.DelegateToCpu,
+                    expeditionSettings)
+                : resolution.Result;
+        }
+
+        public ExpeditionStageResolution ResolveStageBattle(
+            GuildRuntimeData guild,
+            string expeditionId,
+            BattleBalanceSettings battleSettings,
+            ExpeditionBalanceSettings expeditionSettings)
+        {
             if (guild == null)
             {
                 throw new ArgumentNullException(nameof(guild));
@@ -55,12 +75,84 @@ namespace GuildFrontierSim.Application.Processing.Expeditions.Stages
                 new BattleInput(participants, enemyPower),
                 battleSettings);
 
-            return battleResult.Outcome == BattleOutcome.Victory
-                ? ProcessVictory(guild, expedition, participants, battleResult, expeditionSettings)
-                : ProcessDefeat(expedition, participants, battleResult, expeditionSettings);
+            if (battleResult.Outcome == BattleOutcome.Victory)
+            {
+                return ResolveVictory(
+                    guild,
+                    expedition,
+                    participants,
+                    battleResult,
+                    expeditionSettings);
+            }
+
+            ExpeditionStageResult defeatResult = ProcessDefeat(
+                expedition,
+                participants,
+                battleResult,
+                expeditionSettings);
+            guild.MarkStateChanged();
+            return new ExpeditionStageResolution(defeatResult, null);
         }
 
-        private ExpeditionStageResult ProcessVictory(
+        public ExpeditionStageResult ApplyDecision(
+            GuildRuntimeData guild,
+            PendingExpeditionDecision pending,
+            ExpeditionDecision decision,
+            ExpeditionBalanceSettings expeditionSettings)
+        {
+            if (guild == null) throw new ArgumentNullException(nameof(guild));
+            if (pending == null) throw new ArgumentNullException(nameof(pending));
+            ValidateSettings(expeditionSettings);
+            if (pending.IsApplied)
+                throw new InvalidOperationException("The expedition decision was already applied.");
+            if (pending.GuildRevision != guild.Revision)
+                throw new InvalidOperationException("The expedition decision revision is stale.");
+            if (!guild.TryGetExpedition(
+                pending.ExpeditionId,
+                out ExpeditionRuntimeData expedition))
+            {
+                throw new InvalidOperationException("The expedition no longer exists.");
+            }
+            if (expedition.Status != ExpeditionStatus.AwaitingDecision ||
+                expedition.CurrentStage != pending.StageNumber)
+            {
+                throw new InvalidOperationException("The expedition is not awaiting this decision.");
+            }
+
+            List<CharacterRuntimeData> participants = ResolveParticipantsForDecision(
+                guild,
+                expedition);
+            ExpeditionDecision resolvedDecision = decision == ExpeditionDecision.DelegateToCpu
+                ? decisionPolicy.Decide(expedition, participants, expeditionSettings)
+                : decision;
+            ExpeditionStageOutcome outcome;
+            if (resolvedDecision == ExpeditionDecision.Continue)
+            {
+                expedition.ContinueAfterDecision();
+                outcome = ExpeditionStageOutcome.VictoryContinued;
+            }
+            else if (resolvedDecision == ExpeditionDecision.Return)
+            {
+                expedition.ReturnAfterDecision();
+                outcome = ExpeditionStageOutcome.VictoryReturning;
+            }
+            else
+            {
+                throw new ArgumentOutOfRangeException(nameof(decision));
+            }
+
+            pending.MarkApplied();
+            guild.MarkStateChanged();
+            return new ExpeditionStageResult(
+                expedition.ExpeditionId,
+                outcome,
+                pending.BattleResult,
+                pending.StageReward,
+                expedition.TemporaryFunds,
+                pending.RescuedCharacterId);
+        }
+
+        private ExpeditionStageResolution ResolveVictory(
             GuildRuntimeData guild,
             ExpeditionRuntimeData expedition,
             IReadOnlyList<CharacterRuntimeData> participants,
@@ -81,26 +173,42 @@ namespace GuildFrontierSim.Application.Processing.Expeditions.Stages
                 expedition.AddRescuedCharacter(rescuedId);
             }
 
-            ExpeditionDecision decision = decisionPolicy.Decide(expedition, participants, settings);
-            ExpeditionStageOutcome outcome;
-            if (decision == ExpeditionDecision.Return)
+            if (expedition.CurrentStage >= expedition.MaximumStages)
             {
                 expedition.BeginReturn();
-                outcome = ExpeditionStageOutcome.VictoryReturning;
-            }
-            else
-            {
-                expedition.AdvanceStage();
-                outcome = ExpeditionStageOutcome.VictoryContinued;
+                guild.MarkStateChanged();
+                return new ExpeditionStageResolution(
+                    new ExpeditionStageResult(
+                        expedition.ExpeditionId,
+                        ExpeditionStageOutcome.VictoryReturning,
+                        battleResult,
+                        reward,
+                        expedition.TemporaryFunds,
+                        rescuedId),
+                    null);
             }
 
-            return new ExpeditionStageResult(
+            expedition.BeginDecision();
+            guild.MarkStateChanged();
+            var hitPoints = new List<ExpeditionParticipantHp>(participants.Count);
+            for (int index = 0; index < participants.Count; index++)
+            {
+                hitPoints.Add(new ExpeditionParticipantHp(
+                    participants[index].CharacterId,
+                    participants[index].CurrentHp,
+                    participants[index].MaxHp));
+            }
+
+            var pending = new PendingExpeditionDecision(
                 expedition.ExpeditionId,
-                outcome,
+                expedition.CurrentStage,
                 battleResult,
                 reward,
                 expedition.TemporaryFunds,
-                rescuedId);
+                rescuedId,
+                hitPoints,
+                guild.Revision);
+            return new ExpeditionStageResolution(null, pending);
         }
 
         private ExpeditionStageResult ProcessDefeat(
@@ -185,6 +293,25 @@ namespace GuildFrontierSim.Application.Processing.Expeditions.Stages
                 participants.Add(participant);
             }
 
+            return participants;
+        }
+
+        private static List<CharacterRuntimeData> ResolveParticipantsForDecision(
+            GuildRuntimeData guild,
+            ExpeditionRuntimeData expedition)
+        {
+            var participants = new List<CharacterRuntimeData>(expedition.ParticipantIds.Count);
+            for (int index = 0; index < expedition.ParticipantIds.Count; index++)
+            {
+                string participantId = expedition.ParticipantIds[index];
+                if (!guild.TryGetCharacter(participantId, out CharacterRuntimeData participant) ||
+                    participant.Status != CharacterStatus.Expedition)
+                {
+                    throw new InvalidOperationException(
+                        $"Expedition participant is unavailable: {participantId}");
+                }
+                participants.Add(participant);
+            }
             return participants;
         }
 

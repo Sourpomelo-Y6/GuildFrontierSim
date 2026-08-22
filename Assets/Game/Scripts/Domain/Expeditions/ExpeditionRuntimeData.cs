@@ -147,6 +147,27 @@ namespace GuildFrontierSim.Domain.Expeditions
             Status = ExpeditionStatus.Returning;
         }
 
+        public void BeginDecision()
+        {
+            EnsureActive();
+            Status = ExpeditionStatus.AwaitingDecision;
+        }
+
+        public void ContinueAfterDecision()
+        {
+            EnsureAwaitingDecision();
+            if (CurrentStage >= MaximumStages)
+                throw new InvalidOperationException("The expedition is already at its final stage.");
+            CurrentStage++;
+            Status = ExpeditionStatus.Active;
+        }
+
+        public void ReturnAfterDecision()
+        {
+            EnsureAwaitingDecision();
+            Status = ExpeditionStatus.Returning;
+        }
+
         public void Complete()
         {
             if (Status != ExpeditionStatus.Returning)
@@ -169,6 +190,12 @@ namespace GuildFrontierSim.Domain.Expeditions
             {
                 throw new InvalidOperationException("The expedition is not active.");
             }
+        }
+
+        private void EnsureAwaitingDecision()
+        {
+            if (Status != ExpeditionStatus.AwaitingDecision)
+                throw new InvalidOperationException("The expedition is not awaiting a decision.");
         }
 
         private static string ValidateId(string value, string parameterName)
