@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GuildFrontierSim.Application.Processing.Defense;
+using GuildFrontierSim.Application.Assignments.Expeditions;
 using GuildFrontierSim.Application.Processing.Economy;
 using GuildFrontierSim.Application.Processing.Expeditions;
 using GuildFrontierSim.Application.Processing.Expeditions.Stages;
@@ -111,13 +112,13 @@ namespace GuildFrontierSim.Application.Processing.Turns
 
             DefenseBattleResult defenseResult = null;
             LoyaltyResult defenseLoyaltyResult = null;
-            if (request.DefenseRequest != null)
+            if (request.DefenseRequest != null || request.DefenseAssignment != null)
             {
-                defenseResult = defenseProcessor.Process(
-                    guild,
-                    request.DefenseRequest,
-                    selectionSettings,
-                    battleSettings);
+                defenseResult = request.DefenseAssignment == null
+                    ? defenseProcessor.Process(
+                        guild, request.DefenseRequest, selectionSettings, battleSettings)
+                    : defenseProcessor.Process(
+                        guild, request.DefenseAssignment, selectionSettings, battleSettings);
                 if (defenseResult.BattleResult != null)
                 {
                     defenseLoyaltyResult = loyaltyProcessor.ApplyBattleResult(
@@ -130,7 +131,7 @@ namespace GuildFrontierSim.Application.Processing.Turns
 
             ExpeditionStartResult startResult = StartRequestedExpedition(
                 guild,
-                request.ExpeditionStartRequest,
+                request,
                 defenseResult,
                 selectionSettings,
                 battleSettings);
@@ -139,9 +140,13 @@ namespace GuildFrontierSim.Application.Processing.Turns
                 guild,
                 salaryResult,
                 battleSettings);
-            LeadershipResult leadershipResult = leadershipProcessor.Process(
-                guild,
-                battleSettings);
+            LeadershipResult leadershipResult = request.ActingLeaderAssignment == null
+                ? leadershipProcessor.Process(guild, battleSettings)
+                : leadershipProcessor.Process(
+                    guild,
+                    battleSettings,
+                    request.ActingLeaderAssignment,
+                    guild.Revision);
 
             return new TurnResult(
                 guild.CurrentTurn,
@@ -195,19 +200,20 @@ namespace GuildFrontierSim.Application.Processing.Turns
 
         private ExpeditionStartResult StartRequestedExpedition(
             GuildRuntimeData guild,
-            ExpeditionStartRequest request,
+            TurnRequest turnRequest,
             DefenseBattleResult defenseResult,
             CpuSelectionSettings selectionSettings,
             BattleBalanceSettings battleSettings)
         {
-            if (request == null)
+            ExpeditionStartRequest request = turnRequest.ExpeditionStartRequest;
+            if (request == null && turnRequest.ExpeditionAssignment == null)
             {
                 return null;
             }
 
-            var excludedIds = new HashSet<string>(
-                request.ExcludedCharacterIds,
-                StringComparer.Ordinal);
+            var excludedIds = request == null
+                ? new HashSet<string>(StringComparer.Ordinal)
+                : new HashSet<string>(request.ExcludedCharacterIds, StringComparer.Ordinal);
             if (defenseResult != null)
             {
                 for (int index = 0; index < defenseResult.DefenderIds.Count; index++)
@@ -216,19 +222,27 @@ namespace GuildFrontierSim.Application.Processing.Turns
                 }
             }
 
-            return expeditionProcessor.Start(
-                guild,
-                new ExpeditionStartRequest(
-                    request.ExpeditionId,
-                    request.Area,
-                    excludedIds),
-                selectionSettings,
-                battleSettings);
+            return turnRequest.ExpeditionAssignment == null
+                ? expeditionProcessor.Start(
+                    guild,
+                    new ExpeditionStartRequest(
+                        request.ExpeditionId,
+                        request.Area,
+                        excludedIds),
+                    selectionSettings,
+                    battleSettings)
+                : expeditionProcessor.Start(
+                    guild,
+                    turnRequest.ExpeditionAssignment,
+                    turnRequest.ExpeditionAreaRegistry,
+                    selectionSettings,
+                    excludedIds);
         }
 
         private void EnsureConfigured(TurnRequest request, GuildRuntimeData guild)
         {
-            if (request.DefenseRequest != null && defenseProcessor == null)
+            if ((request.DefenseRequest != null || request.DefenseAssignment != null) &&
+                defenseProcessor == null)
             {
                 throw new InvalidOperationException(
                     "A random source is required for defense processing.");

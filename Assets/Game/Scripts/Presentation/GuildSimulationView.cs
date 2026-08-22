@@ -72,7 +72,14 @@ namespace GuildFrontierSim.Presentation
         private void OnAdvanceTurnClicked()
         {
             advanceTurnButton.interactable = false;
-            controller.AdvanceTurn();
+            if (controller.IsManualMode)
+            {
+                controller.BeginManualPlanning();
+            }
+            else
+            {
+                controller.AdvanceTurn();
+            }
             advanceTurnButton.interactable = true;
         }
 

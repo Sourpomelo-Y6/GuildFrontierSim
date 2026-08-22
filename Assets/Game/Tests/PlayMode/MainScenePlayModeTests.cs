@@ -1,4 +1,5 @@
 using System.Collections;
+using GuildFrontierSim.Application.Simulation;
 using GuildFrontierSim.Presentation;
 using NUnit.Framework;
 using UnityEngine;
@@ -39,6 +40,59 @@ namespace GuildFrontierSim.Tests.PlayMode
 
             Assert.That(controller.Guild.CurrentTurn, Is.Zero);
             Assert.That(summaryObject.GetComponent<Text>().text, Does.Contain("ターン: 0"));
+        }
+
+        [UnityTest]
+        public IEnumerator MainScene_ManualModePlansAndAppliesExpeditionTurn()
+        {
+            SceneManager.LoadScene("MainScene");
+            yield return null;
+
+            GuildSimulationController controller =
+                Object.FindObjectOfType<GuildSimulationController>();
+            Button modeButton = GameObject.Find("Management Mode").GetComponent<Button>();
+            Button advanceButton = GameObject.Find("Advance Turn").GetComponent<Button>();
+            Button applyButton = GameObject.Find("Apply Turn Plan").GetComponent<Button>();
+            Dropdown expeditionDropdown =
+                GameObject.Find("Expedition Selection").GetComponent<Dropdown>();
+            Text status = GameObject.Find("Planning Status").GetComponent<Text>();
+
+            modeButton.onClick.Invoke();
+            yield return null;
+            Assert.That(controller.IsManualMode, Is.True);
+
+            advanceButton.onClick.Invoke();
+            yield return null;
+            Assert.That(controller.FlowController.State,
+                Is.EqualTo(SimulationFlowState.PlanningTurn));
+            Assert.That(expeditionDropdown.interactable, Is.True);
+            Assert.That(expeditionDropdown.options, Has.Count.GreaterThan(0));
+            Assert.That(status.text, Does.Contain("遠征"));
+
+            applyButton.onClick.Invoke();
+            yield return null;
+
+            Assert.That(controller.Guild.CurrentTurn, Is.EqualTo(1));
+            Assert.That(controller.Guild.Expeditions, Has.Count.EqualTo(1));
+            Assert.That(controller.FlowController.State,
+                Is.EqualTo(SimulationFlowState.Ready));
+            Assert.That(controller.LastError, Is.Empty);
+
+            advanceButton.onClick.Invoke();
+            yield return null;
+            Dropdown defenseDropdown =
+                GameObject.Find("Defense Selection").GetComponent<Dropdown>();
+            Assert.That(defenseDropdown.interactable, Is.True);
+            string selectedDefender = defenseDropdown.options[defenseDropdown.value].text;
+
+            applyButton.onClick.Invoke();
+            yield return null;
+
+            Assert.That(controller.Guild.CurrentTurn, Is.EqualTo(2));
+            Assert.That(controller.LastAdvanceResult.TurnResult.DefenseResult, Is.Not.Null);
+            Assert.That(
+                controller.LastAdvanceResult.TurnResult.DefenseResult.DefenderIds,
+                Does.Contain(selectedDefender));
         }
     }
 }

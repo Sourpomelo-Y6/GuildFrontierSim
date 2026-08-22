@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using GuildFrontierSim.Application.Processing.Defense;
+using GuildFrontierSim.Application.Assignments.Expeditions;
+using GuildFrontierSim.Application.Planning;
 using GuildFrontierSim.Application.Processing.Economy;
 using GuildFrontierSim.Application.Processing.Expeditions;
 using GuildFrontierSim.Application.Processing.Expeditions.Stages;
@@ -9,6 +11,7 @@ using GuildFrontierSim.Application.Processing.Turns;
 using GuildFrontierSim.Data.Definitions;
 using GuildFrontierSim.Data.Settings;
 using GuildFrontierSim.Domain.Expeditions;
+using GuildFrontierSim.Domain.Characters;
 using GuildFrontierSim.Domain.Guilds;
 using GuildFrontierSim.Infrastructure.Random;
 
@@ -61,8 +64,36 @@ namespace GuildFrontierSim.Application.Simulation
 
         public SimulationAdvanceResult AdvanceTurn()
         {
+            return AdvanceTurnInternal(null);
+        }
+
+        public SimulationAdvanceResult AdvanceTurn(TurnPlan plan)
+        {
+            if (plan == null) throw new ArgumentNullException(nameof(plan));
+            if (plan.TargetTurn != checked(Guild.CurrentTurn + 1) ||
+                plan.GuildRevision != Guild.Revision)
+            {
+                throw new InvalidOperationException("The turn plan is stale.");
+            }
+            return AdvanceTurnInternal(plan);
+        }
+
+        public TurnPlanningRequirements GetNextTurnRequirements()
+        {
             int nextTurn = checked(Guild.CurrentTurn + 1);
-            TurnRequest request = CreateTurnRequest(nextTurn);
+            bool defense = nextTurn % simulationSettings.DefenseIntervalTurns == 0;
+            bool expedition = simulationSettings.AutomaticallyStartExpeditions &&
+                nextTurn % simulationSettings.ExpeditionIntervalTurns == 0 &&
+                !HasOngoingExpedition();
+            bool actingLeader = !Guild.Leader.IsDeparturePending &&
+                !CharacterAvailability.CanBeAssigned(Guild.Leader);
+            return new TurnPlanningRequirements(defense, expedition, actingLeader);
+        }
+
+        private SimulationAdvanceResult AdvanceTurnInternal(TurnPlan plan)
+        {
+            int nextTurn = checked(Guild.CurrentTurn + 1);
+            TurnRequest request = CreateTurnRequest(nextTurn, plan);
             TurnResult turnResult = turnProcessor.Process(
                 Guild,
                 request,
@@ -74,7 +105,7 @@ namespace GuildFrontierSim.Application.Simulation
             return new SimulationAdvanceResult(turnResult, logs);
         }
 
-        private TurnRequest CreateTurnRequest(int nextTurn)
+        private TurnRequest CreateTurnRequest(int nextTurn, TurnPlan plan = null)
         {
             DefenseBattleRequest defenseRequest =
                 nextTurn % simulationSettings.DefenseIntervalTurns == 0
@@ -90,7 +121,22 @@ namespace GuildFrontierSim.Application.Simulation
                     expeditionArea);
             }
 
-            return new TurnRequest(defenseRequest, expeditionRequest);
+            bool manualDefense = defenseRequest != null && plan != null &&
+                !plan.IsDelegatedToCpu(TurnDecisionType.DefenseMembers);
+            bool manualExpedition = expeditionRequest != null && plan != null &&
+                !plan.IsDelegatedToCpu(TurnDecisionType.ExpeditionMembers) &&
+                !plan.IsDelegatedToCpu(TurnDecisionType.ExpeditionArea);
+            return new TurnRequest(
+                manualDefense ? null : defenseRequest,
+                manualExpedition ? null : expeditionRequest,
+                manualDefense ? plan.DefenseAssignment : null,
+                manualExpedition ? plan.ExpeditionAssignment : null,
+                manualExpedition
+                    ? new ExpeditionAreaRegistry(new[] { expeditionArea })
+                    : null,
+                plan != null && !plan.IsDelegatedToCpu(TurnDecisionType.ActingLeader)
+                    ? plan.ActingLeaderAssignment
+                    : null);
         }
 
         private bool HasOngoingExpedition()

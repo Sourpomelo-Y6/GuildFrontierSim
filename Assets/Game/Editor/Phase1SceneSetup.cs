@@ -162,10 +162,11 @@ namespace GuildFrontierSim.Editor
             GuildSimulationController controller =
                 application.AddComponent<GuildSimulationController>();
             GuildSimulationView view = application.AddComponent<GuildSimulationView>();
+            ManualManagementView manualView = application.AddComponent<ManualManagementView>();
             AssignController(controller, preset, area, battle, cpu, expedition, simulation);
 
             Canvas canvas = CreateCanvas();
-            Text title = CreateText(canvas.transform, "Title", "Guild Frontier Sim - Phase 1", 30);
+            Text title = CreateText(canvas.transform, "Title", "Guild Frontier Sim - Phase 2", 30);
             SetRect(title.rectTransform, 24, -20, 1872, 50);
             Text summary = CreateText(canvas.transform, "Summary", string.Empty, 22);
             SetRect(summary.rectTransform, 24, -82, 1872, 70);
@@ -179,6 +180,37 @@ namespace GuildFrontierSim.Editor
             SetRect((RectTransform)button.transform, 24, -900, 680, 120);
             Button resetButton = CreateButton(canvas.transform, "Reset Simulation", "最初から");
             SetRect((RectTransform)resetButton.transform, 724, -900, 200, 120);
+            Button modeButton = CreateButton(canvas.transform, "Management Mode", "CPU経営");
+            SetRect((RectTransform)modeButton.transform, 948, -82, 220, 64);
+
+            GameObject planningPanel = new GameObject(
+                "Manual Planning Panel", typeof(RectTransform), typeof(Image));
+            planningPanel.transform.SetParent(canvas.transform, false);
+            planningPanel.GetComponent<Image>().color = new Color(0.09f, 0.13f, 0.19f, 0.96f);
+            SetRect((RectTransform)planningPanel.transform, 24, -600, 900, 285);
+            Text planningStatus = CreateText(
+                planningPanel.transform, "Planning Status", string.Empty, 18);
+            SetRect(planningStatus.rectTransform, 16, -12, 868, 34);
+            Dropdown defenseDropdown = CreateDropdown(
+                planningPanel.transform, "Defense Selection", "防衛メンバー");
+            SetRect((RectTransform)defenseDropdown.transform, 16, -55, 250, 50);
+            Toggle defenseCpu = CreateToggle(
+                planningPanel.transform, "Delegate Defense", "防衛をCPUへ");
+            SetRect((RectTransform)defenseCpu.transform, 280, -55, 180, 50);
+            Dropdown expeditionDropdown = CreateDropdown(
+                planningPanel.transform, "Expedition Selection", "遠征メンバー");
+            SetRect((RectTransform)expeditionDropdown.transform, 16, -115, 250, 50);
+            Toggle expeditionCpu = CreateToggle(
+                planningPanel.transform, "Delegate Expedition", "遠征をCPUへ");
+            SetRect((RectTransform)expeditionCpu.transform, 280, -115, 180, 50);
+            Dropdown actingDropdown = CreateDropdown(
+                planningPanel.transform, "Acting Leader Selection", "代理リーダー");
+            SetRect((RectTransform)actingDropdown.transform, 16, -175, 250, 50);
+            Toggle actingCpu = CreateToggle(
+                planningPanel.transform, "Delegate Acting Leader", "代理をCPUへ");
+            SetRect((RectTransform)actingCpu.transform, 280, -175, 180, 50);
+            Button applyPlan = CreateButton(planningPanel.transform, "Apply Turn Plan", "計画を確定");
+            SetRect((RectTransform)applyPlan.transform, 500, -55, 370, 170);
 
             SerializedObject viewSerialized = new SerializedObject(view);
             viewSerialized.FindProperty("controller").objectReferenceValue = controller;
@@ -190,6 +222,22 @@ namespace GuildFrontierSim.Editor
             viewSerialized.FindProperty("logText").objectReferenceValue = logs;
             viewSerialized.FindProperty("maximumLogLines").intValue = 12;
             viewSerialized.ApplyModifiedPropertiesWithoutUndo();
+
+            SerializedObject manualSerialized = new SerializedObject(manualView);
+            manualSerialized.FindProperty("controller").objectReferenceValue = controller;
+            manualSerialized.FindProperty("modeButton").objectReferenceValue = modeButton;
+            manualSerialized.FindProperty("modeButtonText").objectReferenceValue =
+                modeButton.GetComponentInChildren<Text>();
+            manualSerialized.FindProperty("planningPanel").objectReferenceValue = planningPanel;
+            manualSerialized.FindProperty("statusText").objectReferenceValue = planningStatus;
+            manualSerialized.FindProperty("defenseDropdown").objectReferenceValue = defenseDropdown;
+            manualSerialized.FindProperty("delegateDefenseToggle").objectReferenceValue = defenseCpu;
+            manualSerialized.FindProperty("expeditionDropdown").objectReferenceValue = expeditionDropdown;
+            manualSerialized.FindProperty("delegateExpeditionToggle").objectReferenceValue = expeditionCpu;
+            manualSerialized.FindProperty("actingLeaderDropdown").objectReferenceValue = actingDropdown;
+            manualSerialized.FindProperty("delegateActingLeaderToggle").objectReferenceValue = actingCpu;
+            manualSerialized.FindProperty("applyButton").objectReferenceValue = applyPlan;
+            manualSerialized.ApplyModifiedPropertiesWithoutUndo();
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[]
@@ -275,6 +323,94 @@ namespace GuildFrontierSim.Editor
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
             return button;
+        }
+
+        private static Toggle CreateToggle(Transform parent, string name, string label)
+        {
+            GameObject root = new GameObject(name, typeof(RectTransform), typeof(Toggle));
+            root.transform.SetParent(parent, false);
+            GameObject box = new GameObject("Background", typeof(RectTransform), typeof(Image));
+            box.transform.SetParent(root.transform, false);
+            SetRect((RectTransform)box.transform, 0, -8, 32, 32);
+            GameObject check = new GameObject("Checkmark", typeof(RectTransform), typeof(Image));
+            check.transform.SetParent(box.transform, false);
+            RectTransform checkRect = (RectTransform)check.transform;
+            checkRect.anchorMin = new Vector2(0.2f, 0.2f);
+            checkRect.anchorMax = new Vector2(0.8f, 0.8f);
+            checkRect.offsetMin = checkRect.offsetMax = Vector2.zero;
+            check.GetComponent<Image>().color = new Color(0.2f, 0.75f, 1f, 1f);
+            Text text = CreateText(root.transform, "Label", label, 17);
+            SetRect(text.rectTransform, 42, -4, 140, 40);
+            Toggle toggle = root.GetComponent<Toggle>();
+            toggle.targetGraphic = box.GetComponent<Image>();
+            toggle.graphic = check.GetComponent<Image>();
+            return toggle;
+        }
+
+        private static Dropdown CreateDropdown(Transform parent, string name, string placeholder)
+        {
+            GameObject root = new GameObject(
+                name, typeof(RectTransform), typeof(Image), typeof(Dropdown));
+            root.transform.SetParent(parent, false);
+            root.GetComponent<Image>().color = new Color(0.14f, 0.2f, 0.29f, 1f);
+            Text caption = CreateText(root.transform, "Label", placeholder, 18);
+            caption.alignment = TextAnchor.MiddleLeft;
+            SetRect(caption.rectTransform, 12, 0, 210, 50);
+
+            GameObject template = new GameObject(
+                "Template", typeof(RectTransform), typeof(Image), typeof(ScrollRect));
+            template.transform.SetParent(root.transform, false);
+            RectTransform templateRect = (RectTransform)template.transform;
+            templateRect.anchorMin = new Vector2(0f, 0f);
+            templateRect.anchorMax = new Vector2(1f, 0f);
+            templateRect.pivot = new Vector2(0.5f, 1f);
+            templateRect.anchoredPosition = Vector2.zero;
+            templateRect.sizeDelta = new Vector2(0f, 180f);
+            template.GetComponent<Image>().color = new Color(0.1f, 0.15f, 0.22f, 1f);
+
+            GameObject viewport = new GameObject(
+                "Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
+            viewport.transform.SetParent(template.transform, false);
+            RectTransform viewportRect = (RectTransform)viewport.transform;
+            viewportRect.anchorMin = Vector2.zero;
+            viewportRect.anchorMax = Vector2.one;
+            viewportRect.offsetMin = viewportRect.offsetMax = Vector2.zero;
+            viewport.GetComponent<Mask>().showMaskGraphic = false;
+
+            GameObject content = new GameObject("Content", typeof(RectTransform));
+            content.transform.SetParent(viewport.transform, false);
+            RectTransform contentRect = (RectTransform)content.transform;
+            contentRect.anchorMin = new Vector2(0f, 1f);
+            contentRect.anchorMax = new Vector2(1f, 1f);
+            contentRect.pivot = new Vector2(0.5f, 1f);
+            contentRect.sizeDelta = new Vector2(0f, 40f);
+
+            GameObject item = new GameObject(
+                "Item", typeof(RectTransform), typeof(Toggle));
+            item.transform.SetParent(content.transform, false);
+            RectTransform itemRect = (RectTransform)item.transform;
+            itemRect.anchorMin = new Vector2(0f, 0.5f);
+            itemRect.anchorMax = new Vector2(1f, 0.5f);
+            itemRect.sizeDelta = new Vector2(0f, 40f);
+            Text itemText = CreateText(item.transform, "Item Label", placeholder, 17);
+            itemText.alignment = TextAnchor.MiddleLeft;
+            itemText.rectTransform.anchorMin = Vector2.zero;
+            itemText.rectTransform.anchorMax = Vector2.one;
+            itemText.rectTransform.offsetMin = new Vector2(12f, 0f);
+            itemText.rectTransform.offsetMax = Vector2.zero;
+            Toggle itemToggle = item.GetComponent<Toggle>();
+            itemToggle.targetGraphic = itemText;
+
+            ScrollRect scroll = template.GetComponent<ScrollRect>();
+            scroll.viewport = viewportRect;
+            scroll.content = contentRect;
+            scroll.horizontal = false;
+            Dropdown dropdown = root.GetComponent<Dropdown>();
+            dropdown.template = templateRect;
+            dropdown.captionText = caption;
+            dropdown.itemText = itemText;
+            template.SetActive(false);
+            return dropdown;
         }
 
         private static void SetRect(

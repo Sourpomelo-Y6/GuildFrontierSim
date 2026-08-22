@@ -1,6 +1,9 @@
 using System;
 using GuildFrontierSim.Application.Factories;
 using GuildFrontierSim.Application.Simulation;
+using GuildFrontierSim.Application.Assignments.Defense;
+using GuildFrontierSim.Application.Assignments.Expeditions;
+using GuildFrontierSim.Application.Planning;
 using GuildFrontierSim.Data.Definitions;
 using GuildFrontierSim.Data.Presets;
 using GuildFrontierSim.Data.Settings;
@@ -23,11 +26,16 @@ namespace GuildFrontierSim.Presentation
         [SerializeField] private GuildSimulationSettings simulationSettings;
 
         public event Action<SimulationAdvanceResult> SimulationAdvanced;
+        public event Action ManualPlanningChanged;
 
         public GuildSimulation Simulation { get; private set; }
         public SimulationAdvanceResult LastAdvanceResult { get; private set; }
         public bool IsInitialized => Simulation != null;
         public GuildRuntimeData Guild => Simulation?.Guild;
+        public bool IsManualMode { get; private set; }
+        public SimulationFlowController FlowController { get; private set; }
+        public TurnPlanningRequirements ManualRequirements { get; private set; }
+        public string LastError { get; private set; } = string.Empty;
 
         private void Start()
         {
@@ -59,6 +67,7 @@ namespace GuildFrontierSim.Presentation
                     simulationSettings,
                     expeditionArea,
                     new UnityRandomSource());
+                CreateFlowController();
                 return true;
             }
             catch (Exception exception)
@@ -79,7 +88,112 @@ namespace GuildFrontierSim.Presentation
         {
             Simulation = null;
             LastAdvanceResult = null;
+            FlowController = null;
+            ManualRequirements = null;
+            LastError = string.Empty;
             return TryInitialize();
+        }
+
+        public void SetManualMode(bool enabled)
+        {
+            if (!IsInitialized && !TryInitialize()) return;
+            IsManualMode = enabled;
+            CreateFlowController();
+            ManualRequirements = null;
+            LastError = string.Empty;
+            ManualPlanningChanged?.Invoke();
+        }
+
+        public bool BeginManualPlanning()
+        {
+            if (!IsManualMode || (!IsInitialized && !TryInitialize())) return false;
+            try
+            {
+                ManualRequirements = Simulation.GetNextTurnRequirements();
+                FlowController.BeginTurnPlanning(
+                    ManualRequirements.RequiresDefense,
+                    ManualRequirements.RequiresExpedition,
+                    ManualRequirements.RequiresActingLeader);
+                LastError = string.Empty;
+                ManualPlanningChanged?.Invoke();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                LastError = exception.Message;
+                ManualPlanningChanged?.Invoke();
+                return false;
+            }
+        }
+
+        public bool ApplyManualSelections(
+            string defenseCharacterId,
+            bool delegateDefense,
+            string expeditionCharacterId,
+            bool delegateExpedition,
+            string actingLeaderCharacterId,
+            bool delegateActingLeader)
+        {
+            if (FlowController == null ||
+                FlowController.State != SimulationFlowState.PlanningTurn)
+                return false;
+            try
+            {
+                TurnPlanningSession session = FlowController.PlanningSession;
+                int revision = Guild.Revision;
+                if (session.IsRequired(TurnDecisionType.DefenseMembers) &&
+                    !session.IsResolved(TurnDecisionType.DefenseMembers))
+                {
+                    if (delegateDefense)
+                        FlowController.DelegateToCpu(TurnDecisionType.DefenseMembers, revision);
+                    else
+                        FlowController.SubmitDefense(
+                            new DefenseAssignment(
+                                simulationSettings.DefenseEnemyBasePower,
+                                new[] { defenseCharacterId }),
+                            revision);
+                }
+
+                if (session.IsRequired(TurnDecisionType.ExpeditionMembers) &&
+                    !session.IsResolved(TurnDecisionType.ExpeditionMembers))
+                {
+                    if (delegateExpedition)
+                        FlowController.DelegateToCpu(TurnDecisionType.ExpeditionMembers, revision);
+                    else
+                        FlowController.SubmitExpedition(
+                            new ExpeditionAssignment(
+                                $"expedition-{session.TargetTurn}",
+                                expeditionArea.Id,
+                                new[] { expeditionCharacterId }),
+                            revision);
+                }
+
+                if (session.IsRequired(TurnDecisionType.ActingLeader) &&
+                    !session.IsResolved(TurnDecisionType.ActingLeader))
+                {
+                    if (delegateActingLeader)
+                        FlowController.DelegateToCpu(TurnDecisionType.ActingLeader, revision);
+                    else
+                        FlowController.SubmitActingLeader(actingLeaderCharacterId, revision);
+                }
+
+                FlowController.ApplyTurnPlan(plan =>
+                {
+                    LastAdvanceResult = Simulation.AdvanceTurn(plan);
+                    PublishAdvanceResult();
+                    return null;
+                });
+                LastError = string.Empty;
+                ManualRequirements = null;
+                ManualPlanningChanged?.Invoke();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                LastError = exception.Message;
+                ManualPlanningChanged?.Invoke();
+                return false;
+            }
         }
 
         public SimulationAdvanceResult AdvanceTurnAndGetResult()
@@ -92,15 +206,7 @@ namespace GuildFrontierSim.Presentation
             try
             {
                 LastAdvanceResult = Simulation.AdvanceTurn();
-                for (int index = 0; index < LastAdvanceResult.Logs.Count; index++)
-                {
-                    SimulationLogEntry entry = LastAdvanceResult.Logs[index];
-                    Debug.Log(
-                        $"[Turn {entry.TurnNumber}][{entry.Category}] {entry.Message}",
-                        this);
-                }
-
-                SimulationAdvanced?.Invoke(LastAdvanceResult);
+                PublishAdvanceResult();
                 return LastAdvanceResult;
             }
             catch (Exception exception)
@@ -110,6 +216,24 @@ namespace GuildFrontierSim.Presentation
                     this);
                 return null;
             }
+        }
+
+        private void CreateFlowController()
+        {
+            GuildControlPolicy policy = IsManualMode
+                ? new GuildControlPolicy(GuildControlMode.Player, Guild.LeaderCharacterId)
+                : new GuildControlPolicy(GuildControlMode.Cpu);
+            FlowController = new SimulationFlowController(Guild, policy);
+        }
+
+        private void PublishAdvanceResult()
+        {
+            for (int index = 0; index < LastAdvanceResult.Logs.Count; index++)
+            {
+                SimulationLogEntry entry = LastAdvanceResult.Logs[index];
+                Debug.Log($"[Turn {entry.TurnNumber}][{entry.Category}] {entry.Message}", this);
+            }
+            SimulationAdvanced?.Invoke(LastAdvanceResult);
         }
 
         private bool TryGetConfigurationError(out string error)
