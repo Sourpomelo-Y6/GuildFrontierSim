@@ -83,6 +83,7 @@ namespace GuildFrontierSim.Domain.Guilds
         public GuildInventory Inventory { get; }
         public IReadOnlyList<ExpeditionRuntimeData> Expeditions => expeditions;
         public int CurrentTurn { get; private set; }
+        public int Revision { get; private set; }
 
         public CharacterRuntimeData Leader => charactersById[LeaderCharacterId];
 
@@ -240,6 +241,12 @@ namespace GuildFrontierSim.Domain.Guilds
         public void AdvanceTurnNumber()
         {
             CurrentTurn = checked(CurrentTurn + 1);
+            MarkStateChanged();
+        }
+
+        public void MarkStateChanged()
+        {
+            Revision = checked(Revision + 1);
         }
     }
 }

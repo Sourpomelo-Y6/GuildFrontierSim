@@ -415,7 +415,7 @@ Presentation/
 
 ### Step 10D: 操作主体とターン計画
 
-- 状態: 次の実装対象
+- 状態: 完了
 - `GuildControlMode`
 - `GuildControlPolicy`
 - `TurnPlanningSession`
