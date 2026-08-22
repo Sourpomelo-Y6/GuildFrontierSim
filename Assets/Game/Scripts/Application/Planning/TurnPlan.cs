@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using GuildFrontierSim.Application.Assignments.Defense;
 using GuildFrontierSim.Application.Assignments.Expeditions;
+using GuildFrontierSim.Application.Assignments.Leadership;
 
 namespace GuildFrontierSim.Application.Planning
 {
@@ -14,14 +15,14 @@ namespace GuildFrontierSim.Application.Planning
             int guildRevision,
             DefenseAssignment defenseAssignment,
             ExpeditionAssignment expeditionAssignment,
-            string actingLeaderCharacterId,
+            ActingLeaderAssignment actingLeaderAssignment,
             IEnumerable<TurnDecisionType> cpuDecisions)
         {
             TargetTurn = targetTurn;
             GuildRevision = guildRevision;
             DefenseAssignment = defenseAssignment;
             ExpeditionAssignment = expeditionAssignment;
-            ActingLeaderCharacterId = actingLeaderCharacterId ?? string.Empty;
+            ActingLeaderAssignment = actingLeaderAssignment;
             this.cpuDecisions = new HashSet<TurnDecisionType>(
                 cpuDecisions ?? throw new ArgumentNullException(nameof(cpuDecisions)));
         }
@@ -30,7 +31,8 @@ namespace GuildFrontierSim.Application.Planning
         public int GuildRevision { get; }
         public DefenseAssignment DefenseAssignment { get; }
         public ExpeditionAssignment ExpeditionAssignment { get; }
-        public string ActingLeaderCharacterId { get; }
+        public ActingLeaderAssignment ActingLeaderAssignment { get; }
+        public string ActingLeaderCharacterId => ActingLeaderAssignment?.CharacterId ?? string.Empty;
 
         public bool IsDelegatedToCpu(TurnDecisionType decision)
         {

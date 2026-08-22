@@ -64,7 +64,7 @@ namespace GuildFrontierSim.Application.Planning
                 session.GuildRevision,
                 session.DefenseAssignment,
                 session.ExpeditionAssignment,
-                session.ActingLeaderCharacterId,
+                session.ActingLeaderAssignment,
                 session.CpuDecisions);
         }
 

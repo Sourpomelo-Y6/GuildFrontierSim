@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GuildFrontierSim.Application.Assignments.Leadership;
 using GuildFrontierSim.Application.Processing.Economy;
 using GuildFrontierSim.Data.Settings;
 using GuildFrontierSim.Domain.Battles;
@@ -12,13 +13,45 @@ namespace GuildFrontierSim.Application.Processing.Leadership
     {
         private readonly BattlePowerCalculator powerCalculator;
         private readonly LoyaltyProcessor loyaltyProcessor;
+        private readonly ActingLeaderAssignmentValidator assignmentValidator;
 
         public LeadershipProcessor(
             BattlePowerCalculator powerCalculator = null,
-            LoyaltyProcessor loyaltyProcessor = null)
+            LoyaltyProcessor loyaltyProcessor = null,
+            ActingLeaderAssignmentValidator assignmentValidator = null)
         {
             this.powerCalculator = powerCalculator ?? new BattlePowerCalculator();
             this.loyaltyProcessor = loyaltyProcessor ?? new LoyaltyProcessor();
+            this.assignmentValidator = assignmentValidator ??
+                new ActingLeaderAssignmentValidator();
+        }
+
+        public LeadershipResult Process(
+            GuildRuntimeData guild,
+            BattleBalanceSettings settings,
+            ActingLeaderAssignment assignment,
+            int guildRevision)
+        {
+            if (guild == null) throw new ArgumentNullException(nameof(guild));
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
+            ActingLeaderValidationResult validation = assignmentValidator.Validate(
+                guild,
+                assignment,
+                guildRevision);
+            if (!validation.IsValid)
+            {
+                throw new InvalidOperationException(
+                    $"Invalid acting leader assignment: {validation.Error}.");
+            }
+
+            string previousLeaderId = guild.LeaderCharacterId;
+            guild.SetActingLeader(validation.Candidate.CharacterId);
+            guild.MarkStateChanged();
+            return CreateResult(
+                LeadershipOutcome.ActingLeaderAssigned,
+                previousLeaderId,
+                guild,
+                null);
         }
 
         public LeadershipResult Process(
@@ -111,15 +144,15 @@ namespace GuildFrontierSim.Application.Processing.Leadership
         {
             CharacterRuntimeData best = null;
             float bestPower = 0f;
-            for (int index = 0; index < guild.Characters.Count; index++)
+            IReadOnlyList<CharacterRuntimeData> candidates =
+                assignmentValidator.GetCandidates(guild);
+            for (int index = 0; index < candidates.Count; index++)
             {
-                CharacterRuntimeData candidate = guild.Characters[index];
+                CharacterRuntimeData candidate = candidates[index];
                 if (string.Equals(
-                        candidate.CharacterId,
-                        excludedCharacterId,
-                        StringComparison.Ordinal) ||
-                    candidate.IsDeparturePending ||
-                    !CharacterAvailability.CanBeAssigned(candidate))
+                    candidate.CharacterId,
+                    excludedCharacterId,
+                    StringComparison.Ordinal))
                 {
                     continue;
                 }

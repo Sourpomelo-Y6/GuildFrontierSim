@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using GuildFrontierSim.Application.Assignments.Defense;
 using GuildFrontierSim.Application.Assignments.Expeditions;
+using GuildFrontierSim.Application.Assignments.Leadership;
 
 namespace GuildFrontierSim.Application.Planning
 {
@@ -43,6 +44,7 @@ namespace GuildFrontierSim.Application.Planning
         public DefenseAssignment DefenseAssignment { get; private set; }
         public ExpeditionAssignment ExpeditionAssignment { get; private set; }
         public string ActingLeaderCharacterId { get; private set; } = string.Empty;
+        public ActingLeaderAssignment ActingLeaderAssignment { get; private set; }
         internal IEnumerable<TurnDecisionType> CpuDecisions => cpuDecisions;
 
         public bool IsRequired(TurnDecisionType decision) => requiredDecisions.Contains(decision);
@@ -77,9 +79,8 @@ namespace GuildFrontierSim.Application.Planning
         public void SubmitActingLeader(string characterId, int guildRevision)
         {
             EnsureSubmissionAllowed(TurnDecisionType.ActingLeader, guildRevision);
-            if (string.IsNullOrWhiteSpace(characterId))
-                throw new ArgumentException("Acting leader ID cannot be empty.", nameof(characterId));
-            ActingLeaderCharacterId = characterId.Trim();
+            ActingLeaderAssignment = new ActingLeaderAssignment(characterId);
+            ActingLeaderCharacterId = ActingLeaderAssignment.CharacterId;
             Resolve(TurnDecisionType.ActingLeader);
         }
 

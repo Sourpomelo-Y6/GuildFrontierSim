@@ -202,6 +202,29 @@ namespace GuildFrontierSim.Tests.Application.Planning
             Assert.Throws<InvalidOperationException>(() => session.MarkApplied(guild.Revision));
         }
 
+        [Test]
+        public void SubmitActingLeader_BuildsTypedAssignment()
+        {
+            CharacterRuntimeData leader = Character("leader");
+            leader.SetStatus(CharacterStatus.Hospitalized, 1);
+            CharacterRuntimeData player = Character("player", isPlayer: true);
+            GuildRuntimeData guild = Guild(leader, player, Character("candidate"));
+            guild.SetActingLeader("player");
+            var builder = new TurnPlanBuilder();
+            TurnPlanningSession session = builder.Begin(
+                guild,
+                new GuildControlPolicy(GuildControlMode.Player, "player"),
+                requiresDefense: false,
+                requiresExpedition: false,
+                requiresActingLeader: true);
+
+            session.SubmitActingLeader("candidate", guild.Revision);
+            TurnPlan plan = builder.Build(guild, session);
+
+            Assert.That(plan.ActingLeaderAssignment.CharacterId, Is.EqualTo("candidate"));
+            Assert.That(plan.ActingLeaderCharacterId, Is.EqualTo("candidate"));
+        }
+
         private static GuildRuntimeData Guild(params CharacterRuntimeData[] characters)
         {
             return new GuildRuntimeData("Guild", 100, characters, characters[0].CharacterId);

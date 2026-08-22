@@ -1,3 +1,5 @@
+using System;
+using GuildFrontierSim.Application.Assignments.Leadership;
 using GuildFrontierSim.Application.Processing.Leadership;
 using GuildFrontierSim.Data.Settings;
 using GuildFrontierSim.Domain.Characters;
@@ -178,6 +180,63 @@ namespace GuildFrontierSim.Tests.Application.Processing.Leadership
                 LeadershipResult result = new LeadershipProcessor().Process(guild, settings);
 
                 Assert.That(result.ActingLeaderId, Is.EqualTo("eligible"));
+            }
+            finally
+            {
+                TestAssetFactory.Destroy(settings);
+            }
+        }
+
+        [Test]
+        public void Process_WithExplicitAssignment_UsesRequestedCandidate()
+        {
+            CharacterRuntimeData leader = CreateCharacter("leader", level: 10);
+            CharacterRuntimeData strongest = CreateCharacter("strongest", level: 5);
+            CharacterRuntimeData requested = CreateCharacter("requested", level: 1);
+            leader.SetStatus(CharacterStatus.Hospitalized, 2);
+            GuildRuntimeData guild = CreateGuild(leader, strongest, requested);
+            BattleBalanceSettings settings = TestAssetFactory.CreateBattleSettings();
+
+            try
+            {
+                LeadershipResult result = new LeadershipProcessor().Process(
+                    guild,
+                    settings,
+                    new ActingLeaderAssignment("requested"),
+                    guild.Revision);
+
+                Assert.That(result.Outcome, Is.EqualTo(LeadershipOutcome.ActingLeaderAssigned));
+                Assert.That(result.ActingLeaderId, Is.EqualTo("requested"));
+                Assert.That(guild.ActingLeaderCharacterId, Is.EqualTo("requested"));
+                Assert.That(guild.Revision, Is.EqualTo(1));
+            }
+            finally
+            {
+                TestAssetFactory.Destroy(settings);
+            }
+        }
+
+        [Test]
+        public void Process_WithInvalidExplicitAssignment_DoesNotChangeLeadership()
+        {
+            CharacterRuntimeData leader = CreateCharacter("leader");
+            CharacterRuntimeData member = CreateCharacter("member");
+            leader.SetStatus(CharacterStatus.Hospitalized, 2);
+            member.SetStatus(CharacterStatus.Injured, 1);
+            GuildRuntimeData guild = CreateGuild(leader, member);
+            BattleBalanceSettings settings = TestAssetFactory.CreateBattleSettings();
+
+            try
+            {
+                Assert.Throws<InvalidOperationException>(() =>
+                    new LeadershipProcessor().Process(
+                        guild,
+                        settings,
+                        new ActingLeaderAssignment("member"),
+                        guild.Revision));
+
+                Assert.That(guild.ActingLeaderCharacterId, Is.Empty);
+                Assert.That(guild.Revision, Is.Zero);
             }
             finally
             {
