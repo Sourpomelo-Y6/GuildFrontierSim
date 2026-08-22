@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: whispering-forest
   displayName: "\u3055\u3055\u3084\u304D\u306E\u68EE"
-  enemyPower: 70
+  enemyPower: 35
   maximumStages: 3
   rewardMultiplier: 1
   canContainCaptives: 1

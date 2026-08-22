@@ -88,6 +88,21 @@ namespace GuildFrontierSim.Tests.PlayMode
             applyButton.onClick.Invoke();
             yield return null;
 
+            GameObject decisionPanel = GameObject.Find("Expedition Decision Panel");
+            Assert.That(decisionPanel, Is.Not.Null);
+            Assert.That(decisionPanel.activeSelf, Is.True);
+            Text decisionDetails = GameObject.Find("Decision Details").GetComponent<Text>();
+            Assert.That(decisionDetails.text, Does.Contain("戦闘結果"));
+            Assert.That(decisionDetails.text, Does.Contain("今回の獲得資金"));
+            Assert.That(decisionDetails.text, Does.Contain("参加者HP"));
+            Assert.That(controller.FlowController.State,
+                Is.EqualTo(SimulationFlowState.WaitingForExpeditionDecision));
+            Assert.That(advanceButton.interactable, Is.False);
+            Assert.That(modeButton.interactable, Is.False);
+
+            GameObject.Find("Continue Expedition").GetComponent<Button>().onClick.Invoke();
+            yield return null;
+
             Assert.That(controller.Guild.CurrentTurn, Is.EqualTo(2));
             Assert.That(controller.LastAdvanceResult.TurnResult.DefenseResult, Is.Not.Null);
             Assert.That(

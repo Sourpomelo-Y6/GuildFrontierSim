@@ -29,6 +29,7 @@ namespace GuildFrontierSim.Presentation
             }
 
             controller.SimulationAdvanced += OnSimulationAdvanced;
+            controller.ManualPlanningChanged += Refresh;
             advanceTurnButton.onClick.AddListener(OnAdvanceTurnClicked);
             resetButton.onClick.AddListener(OnResetClicked);
             if (controller.TryInitialize())
@@ -42,6 +43,7 @@ namespace GuildFrontierSim.Presentation
             if (controller != null)
             {
                 controller.SimulationAdvanced -= OnSimulationAdvanced;
+                controller.ManualPlanningChanged -= Refresh;
             }
 
             if (advanceTurnButton != null)
@@ -67,6 +69,8 @@ namespace GuildFrontierSim.Presentation
             membersText.text = BuildMembers(guild);
             expeditionsText.text = BuildExpeditions(guild);
             logText.text = BuildLogs(controller.Simulation);
+            advanceTurnButton.interactable = !controller.IsManualMode ||
+                controller.FlowController.State == SimulationFlowState.Ready;
         }
 
         private void OnAdvanceTurnClicked()

@@ -121,7 +121,7 @@ namespace GuildFrontierSim.Editor
             SerializedObject serialized = new SerializedObject(asset);
             Set(serialized, "id", "whispering-forest");
             Set(serialized, "displayName", "ささやきの森");
-            Set(serialized, "enemyPower", 70);
+            Set(serialized, "enemyPower", 35);
             Set(serialized, "maximumStages", 3);
             Set(serialized, "rewardMultiplier", 1f);
             Set(serialized, "canContainCaptives", true);
@@ -163,6 +163,7 @@ namespace GuildFrontierSim.Editor
                 application.AddComponent<GuildSimulationController>();
             GuildSimulationView view = application.AddComponent<GuildSimulationView>();
             ManualManagementView manualView = application.AddComponent<ManualManagementView>();
+            ExpeditionDecisionView decisionView = application.AddComponent<ExpeditionDecisionView>();
             AssignController(controller, preset, area, battle, cpu, expedition, simulation);
 
             Canvas canvas = CreateCanvas();
@@ -238,6 +239,37 @@ namespace GuildFrontierSim.Editor
             manualSerialized.FindProperty("delegateActingLeaderToggle").objectReferenceValue = actingCpu;
             manualSerialized.FindProperty("applyButton").objectReferenceValue = applyPlan;
             manualSerialized.ApplyModifiedPropertiesWithoutUndo();
+
+            GameObject decisionPanel = new GameObject(
+                "Expedition Decision Panel", typeof(RectTransform), typeof(Image));
+            decisionPanel.transform.SetParent(canvas.transform, false);
+            decisionPanel.GetComponent<Image>().color = new Color(0.07f, 0.1f, 0.16f, 0.99f);
+            SetRect((RectTransform)decisionPanel.transform, 510, -180, 900, 650);
+            Text decisionTitle = CreateText(
+                decisionPanel.transform, "Decision Title", "遠征結果", 28);
+            decisionTitle.alignment = TextAnchor.MiddleCenter;
+            SetRect(decisionTitle.rectTransform, 20, -16, 860, 50);
+            Text decisionDetails = CreateText(
+                decisionPanel.transform, "Decision Details", string.Empty, 20);
+            SetRect(decisionDetails.rectTransform, 36, -82, 828, 400);
+            Button continueButton = CreateButton(
+                decisionPanel.transform, "Continue Expedition", "遠征を続ける");
+            SetRect((RectTransform)continueButton.transform, 36, -520, 250, 90);
+            Button returnButton = CreateButton(
+                decisionPanel.transform, "Return Expedition", "帰還する");
+            SetRect((RectTransform)returnButton.transform, 325, -520, 250, 90);
+            Button delegateButton = CreateButton(
+                decisionPanel.transform, "Delegate Expedition Decision", "CPUに任せる");
+            SetRect((RectTransform)delegateButton.transform, 614, -520, 250, 90);
+
+            SerializedObject decisionSerialized = new SerializedObject(decisionView);
+            decisionSerialized.FindProperty("controller").objectReferenceValue = controller;
+            decisionSerialized.FindProperty("panel").objectReferenceValue = decisionPanel;
+            decisionSerialized.FindProperty("detailsText").objectReferenceValue = decisionDetails;
+            decisionSerialized.FindProperty("continueButton").objectReferenceValue = continueButton;
+            decisionSerialized.FindProperty("returnButton").objectReferenceValue = returnButton;
+            decisionSerialized.FindProperty("delegateButton").objectReferenceValue = delegateButton;
+            decisionSerialized.ApplyModifiedPropertiesWithoutUndo();
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[]

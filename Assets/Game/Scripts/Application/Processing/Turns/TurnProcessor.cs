@@ -100,15 +100,33 @@ namespace GuildFrontierSim.Application.Processing.Turns
             guild.AdvanceTurnNumber();
             RecoveryResult recoveryResult = recoveryProcessor.Process(guild);
             var returnResults = new List<ExpeditionReturnResult>();
-            var stageResults = new List<ExpeditionStageResult>();
+            var stageResults = new List<ExpeditionStageResult>(
+                request.PreprocessedStageResults);
             var expeditionLoyaltyResults = new List<LoyaltyResult>();
-            ProcessExistingExpeditions(
-                guild,
-                battleSettings,
-                expeditionSettings,
-                returnResults,
-                stageResults,
-                expeditionLoyaltyResults);
+            for (int index = 0; index < request.PreprocessedStageResults.Count; index++)
+            {
+                ExpeditionStageResult preprocessed = request.PreprocessedStageResults[index];
+                if (guild.TryGetExpedition(
+                    preprocessed.ExpeditionId,
+                    out ExpeditionRuntimeData preprocessedExpedition))
+                {
+                    expeditionLoyaltyResults.Add(loyaltyProcessor.ApplyBattleResult(
+                        guild,
+                        preprocessedExpedition.ParticipantIds,
+                        preprocessed.BattleResult.Outcome,
+                        battleSettings));
+                }
+            }
+            if (!request.SkipExistingExpeditions)
+            {
+                ProcessExistingExpeditions(
+                    guild,
+                    battleSettings,
+                    expeditionSettings,
+                    returnResults,
+                    stageResults,
+                    expeditionLoyaltyResults);
+            }
 
             DefenseBattleResult defenseResult = null;
             LoyaltyResult defenseLoyaltyResult = null;
@@ -160,6 +178,32 @@ namespace GuildFrontierSim.Application.Processing.Turns
                 defenseResult,
                 defenseLoyaltyResult,
                 startResult);
+        }
+
+        public ExpeditionStageResolution ResolveExpeditionStage(
+            GuildRuntimeData guild,
+            string expeditionId,
+            BattleBalanceSettings battleSettings,
+            ExpeditionBalanceSettings expeditionSettings)
+        {
+            if (expeditionStageProcessor == null)
+                throw new InvalidOperationException(
+                    "A random source is required for expedition stage processing.");
+            return expeditionStageProcessor.ResolveStageBattle(
+                guild, expeditionId, battleSettings, expeditionSettings);
+        }
+
+        public ExpeditionStageResult ApplyExpeditionDecision(
+            GuildRuntimeData guild,
+            PendingExpeditionDecision pending,
+            ExpeditionDecision decision,
+            ExpeditionBalanceSettings expeditionSettings)
+        {
+            if (expeditionStageProcessor == null)
+                throw new InvalidOperationException(
+                    "A random source is required for expedition decision processing.");
+            return expeditionStageProcessor.ApplyDecision(
+                guild, pending, decision, expeditionSettings);
         }
 
         private void ProcessExistingExpeditions(

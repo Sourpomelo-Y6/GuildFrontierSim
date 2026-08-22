@@ -41,6 +41,10 @@ namespace GuildFrontierSim.Presentation
         {
             if (controller == null || controller.Guild == null) return;
             modeButtonText.text = controller.IsManualMode ? "手動経営" : "CPU経営";
+            modeButton.interactable = controller.FlowController == null ||
+                (controller.FlowController.State != SimulationFlowState.ApplyingTurn &&
+                 controller.FlowController.State !=
+                    SimulationFlowState.WaitingForExpeditionDecision);
             bool isPlanning = controller.IsManualMode &&
                 controller.FlowController != null &&
                 controller.FlowController.State == SimulationFlowState.PlanningTurn;
@@ -51,7 +55,10 @@ namespace GuildFrontierSim.Presentation
             if (!string.IsNullOrEmpty(controller.LastError))
                 statusText.text = $"エラー: {controller.LastError}";
             else if (!isPlanning)
-                statusText.text = "「次のターン」で計画を開始します。";
+                statusText.text = controller.FlowController.State ==
+                    SimulationFlowState.WaitingForExpeditionDecision
+                    ? "遠征結果の判断待ちです。"
+                    : "「次のターン」で計画を開始します。";
             else
                 statusText.text = BuildRequirementText(controller.ManualRequirements);
         }

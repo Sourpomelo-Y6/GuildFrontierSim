@@ -64,7 +64,7 @@ namespace GuildFrontierSim.Application.Simulation
 
         public SimulationAdvanceResult AdvanceTurn()
         {
-            return AdvanceTurnInternal(null);
+            return AdvanceTurnInternal(null, false, null);
         }
 
         public SimulationAdvanceResult AdvanceTurn(TurnPlan plan)
@@ -75,7 +75,7 @@ namespace GuildFrontierSim.Application.Simulation
             {
                 throw new InvalidOperationException("The turn plan is stale.");
             }
-            return AdvanceTurnInternal(plan);
+            return AdvanceTurnInternal(plan, false, null);
         }
 
         public TurnPlanningRequirements GetNextTurnRequirements()
@@ -90,10 +90,53 @@ namespace GuildFrontierSim.Application.Simulation
             return new TurnPlanningRequirements(defense, expedition, actingLeader);
         }
 
-        private SimulationAdvanceResult AdvanceTurnInternal(TurnPlan plan)
+        public ExpeditionStageResolution ResolveManualExpeditionStage()
+        {
+            for (int index = 0; index < Guild.Expeditions.Count; index++)
+            {
+                ExpeditionRuntimeData expedition = Guild.Expeditions[index];
+                if (expedition.Status == ExpeditionStatus.Active)
+                {
+                    return turnProcessor.ResolveExpeditionStage(
+                        Guild,
+                        expedition.ExpeditionId,
+                        battleSettings,
+                        expeditionSettings);
+                }
+            }
+            return null;
+        }
+
+        public ExpeditionStageResult ApplyManualExpeditionDecision(
+            PendingExpeditionDecision pending,
+            ExpeditionDecision decision)
+        {
+            return turnProcessor.ApplyExpeditionDecision(
+                Guild, pending, decision, expeditionSettings);
+        }
+
+        public SimulationAdvanceResult ResumeTurnAfterManualExpedition(
+            TurnPlan plan,
+            ExpeditionStageResult stageResult)
+        {
+            if (plan == null) throw new ArgumentNullException(nameof(plan));
+            if (stageResult == null) throw new ArgumentNullException(nameof(stageResult));
+            if (plan.TargetTurn != checked(Guild.CurrentTurn + 1))
+                throw new InvalidOperationException("The target turn is stale.");
+            return AdvanceTurnInternal(plan, true, stageResult);
+        }
+
+        private SimulationAdvanceResult AdvanceTurnInternal(
+            TurnPlan plan,
+            bool skipExistingExpeditions,
+            ExpeditionStageResult preprocessedStageResult)
         {
             int nextTurn = checked(Guild.CurrentTurn + 1);
-            TurnRequest request = CreateTurnRequest(nextTurn, plan);
+            TurnRequest request = CreateTurnRequest(
+                nextTurn,
+                plan,
+                skipExistingExpeditions,
+                preprocessedStageResult);
             TurnResult turnResult = turnProcessor.Process(
                 Guild,
                 request,
@@ -105,7 +148,11 @@ namespace GuildFrontierSim.Application.Simulation
             return new SimulationAdvanceResult(turnResult, logs);
         }
 
-        private TurnRequest CreateTurnRequest(int nextTurn, TurnPlan plan = null)
+        private TurnRequest CreateTurnRequest(
+            int nextTurn,
+            TurnPlan plan = null,
+            bool skipExistingExpeditions = false,
+            ExpeditionStageResult preprocessedStageResult = null)
         {
             DefenseBattleRequest defenseRequest =
                 nextTurn % simulationSettings.DefenseIntervalTurns == 0
@@ -136,7 +183,11 @@ namespace GuildFrontierSim.Application.Simulation
                     : null,
                 plan != null && !plan.IsDelegatedToCpu(TurnDecisionType.ActingLeader)
                     ? plan.ActingLeaderAssignment
-                    : null);
+                    : null,
+                skipExistingExpeditions,
+                preprocessedStageResult == null
+                    ? null
+                    : new[] { preprocessedStageResult });
         }
 
         private bool HasOngoingExpedition()

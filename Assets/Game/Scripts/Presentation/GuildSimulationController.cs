@@ -4,6 +4,7 @@ using GuildFrontierSim.Application.Simulation;
 using GuildFrontierSim.Application.Assignments.Defense;
 using GuildFrontierSim.Application.Assignments.Expeditions;
 using GuildFrontierSim.Application.Planning;
+using GuildFrontierSim.Application.Processing.Expeditions.Stages;
 using GuildFrontierSim.Data.Definitions;
 using GuildFrontierSim.Data.Presets;
 using GuildFrontierSim.Data.Settings;
@@ -36,6 +37,7 @@ namespace GuildFrontierSim.Presentation
         public SimulationFlowController FlowController { get; private set; }
         public TurnPlanningRequirements ManualRequirements { get; private set; }
         public string LastError { get; private set; } = string.Empty;
+        private TurnPlan pendingTurnPlan;
 
         private void Start()
         {
@@ -91,6 +93,7 @@ namespace GuildFrontierSim.Presentation
             FlowController = null;
             ManualRequirements = null;
             LastError = string.Empty;
+            pendingTurnPlan = null;
             return TryInitialize();
         }
 
@@ -179,12 +182,62 @@ namespace GuildFrontierSim.Presentation
 
                 FlowController.ApplyTurnPlan(plan =>
                 {
-                    LastAdvanceResult = Simulation.AdvanceTurn(plan);
-                    PublishAdvanceResult();
-                    return null;
+                    ExpeditionStageResolution resolution =
+                        Simulation.ResolveManualExpeditionStage();
+                    if (resolution == null)
+                    {
+                        CompletePlannedTurn(Simulation.AdvanceTurn(plan));
+                        return null;
+                    }
+                    if (!resolution.IsWaitingForDecision)
+                    {
+                        CompletePlannedTurn(
+                            Simulation.ResumeTurnAfterManualExpedition(
+                                plan, resolution.Result));
+                        return null;
+                    }
+
+                    pendingTurnPlan = plan;
+                    return resolution.PendingDecision;
                 });
                 LastError = string.Empty;
                 ManualRequirements = null;
+                ManualPlanningChanged?.Invoke();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                LastError = exception.Message;
+                ManualPlanningChanged?.Invoke();
+                return false;
+            }
+        }
+
+        public bool ApplyManualExpeditionDecision(ExpeditionDecision decision)
+        {
+            if (FlowController == null ||
+                FlowController.State != SimulationFlowState.WaitingForExpeditionDecision ||
+                pendingTurnPlan == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                FlowController.SubmitExpeditionDecision(
+                    decision,
+                    (pending, selectedDecision) =>
+                    {
+                        ExpeditionStageResult stageResult =
+                            Simulation.ApplyManualExpeditionDecision(
+                                pending, selectedDecision);
+                        CompletePlannedTurn(
+                            Simulation.ResumeTurnAfterManualExpedition(
+                                pendingTurnPlan, stageResult));
+                    });
+                pendingTurnPlan = null;
+                ManualRequirements = null;
+                LastError = string.Empty;
                 ManualPlanningChanged?.Invoke();
                 return true;
             }
@@ -234,6 +287,12 @@ namespace GuildFrontierSim.Presentation
                 Debug.Log($"[Turn {entry.TurnNumber}][{entry.Category}] {entry.Message}", this);
             }
             SimulationAdvanced?.Invoke(LastAdvanceResult);
+        }
+
+        private void CompletePlannedTurn(SimulationAdvanceResult result)
+        {
+            LastAdvanceResult = result;
+            PublishAdvanceResult();
         }
 
         private bool TryGetConfigurationError(out string error)
