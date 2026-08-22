@@ -23,6 +23,8 @@
 
 Phase 1 の実装と完成確認が完了しています。Unityで`MainScene`を再生し、ボタンからターンを進めると、CPUによる防衛・遠征・給料・忠誠度・回復・リーダー処理を確認できます。
 
+現在はPhase 2「手動経営」の設計が完了し、CPU自動判断とプレイヤー判断を共通処理へ接続する実装段階です。
+
 現在実行できるゲームサイクルは次のとおりです。
 
 ```text
@@ -94,6 +96,7 @@ Unity Editorメニューの`Guild Frontier Sim > Build Windows Development Playe
 - [開発指示・基本設計](Docs/GuildFrontierSimDevelopmentGuide.md)
 - [Phase 1 経営自動シミュレーション設計](Docs/Phase1Design.md)
 - [Phase 1 完成確認レポート](Docs/Phase1CompletionReport.md)
+- [Phase 2 手動経営設計](Docs/Phase2Design.md)
 - [ComfyUI キャラクターグラフィック生成・連携設計](Docs/ComfyUICharacterGraphicsIntegration.md)
 
 実装時は、まずメインの開発指示と対象フェーズの設計書を確認してください。
@@ -126,6 +129,8 @@ UnityはComfyUIへ直接接続しません。そのため、ComfyUIやWPFツー�
 ### Phase 2：手動経営
 
 防衛・遠征メンバー、遠征先、遠征継続、代理ギルド長などをプレイヤーが選択できるようにします。
+
+設計と明示的な防衛割り当ての共通処理まで完了しています。現在はUIへ接続する前段階で、CPU自動選出と手動指定のどちらも同じ検証・戦闘結果適用処理を利用します。次は明示的な遠征開始を実装します。
 
 ### Phase 3：プレイヤー冒険者モード
 

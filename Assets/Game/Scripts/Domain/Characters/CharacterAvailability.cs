@@ -7,7 +7,8 @@ namespace GuildFrontierSim.Domain.Characters
             return character != null &&
                    character.Status == CharacterStatus.Available &&
                    character.CurrentHp > 0 &&
-                   character.UnavailableTurnsRemaining == 0;
+                   character.UnavailableTurnsRemaining == 0 &&
+                   !character.IsDeparturePending;
         }
     }
 }

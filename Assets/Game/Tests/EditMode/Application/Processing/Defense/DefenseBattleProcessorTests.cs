@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using GuildFrontierSim.Application.Assignments.Defense;
 using GuildFrontierSim.Application.Processing.Defense;
 using GuildFrontierSim.Data.Settings;
 using GuildFrontierSim.Domain.Battles;
@@ -260,6 +261,94 @@ namespace GuildFrontierSim.Tests.Application.Processing.Defense
 
                 Assert.That(result.DefenderIds.Single(), Is.EqualTo("next"));
                 Assert.That(strongest.Status, Is.EqualTo(CharacterStatus.Available));
+            }
+            finally
+            {
+                TestAssetFactory.Destroy(selectionSettings, battleSettings);
+            }
+        }
+
+        [Test]
+        public void Process_WithExplicitAssignment_UsesOnlyRequestedDefender()
+        {
+            CharacterRuntimeData strongest = CreateCharacter("strongest", attack: 100);
+            CharacterRuntimeData requested = CreateCharacter("requested", attack: 10);
+            GuildRuntimeData guild = CreateGuild(strongest, requested);
+            CpuSelectionSettings selectionSettings =
+                TestAssetFactory.CreateCpuSelectionSettings(desiredDefenseMembers: 1);
+            BattleBalanceSettings battleSettings = TestAssetFactory.CreateBattleSettings(
+                minimumPowerMultiplier: 1f,
+                maximumPowerMultiplier: 1f,
+                victoryInjuryChance: 0f,
+                minimumDefenseReward: 10,
+                maximumDefenseReward: 10);
+            var random = new SequenceRandomSource(
+                integerValues: new[] { 10 },
+                floatValues: new[] { 0.5f, 0.5f, 0.9f });
+
+            try
+            {
+                DefenseBattleResult result = new DefenseBattleProcessor(random).Process(
+                    guild,
+                    new DefenseAssignment(1f, new[] { requested.CharacterId }),
+                    selectionSettings,
+                    battleSettings);
+
+                Assert.That(result.DefenderIds, Is.EqualTo(new[] { "requested" }));
+                Assert.That(strongest.Status, Is.EqualTo(CharacterStatus.Available));
+            }
+            finally
+            {
+                TestAssetFactory.Destroy(selectionSettings, battleSettings);
+            }
+        }
+
+        [Test]
+        public void Process_WithEmptyExplicitAssignment_ReturnsNoDefenders()
+        {
+            CharacterRuntimeData character = CreateCharacter("member");
+            GuildRuntimeData guild = CreateGuild(character);
+            CpuSelectionSettings selectionSettings = TestAssetFactory.CreateCpuSelectionSettings();
+            BattleBalanceSettings battleSettings = TestAssetFactory.CreateBattleSettings();
+
+            try
+            {
+                DefenseBattleResult result = new DefenseBattleProcessor(
+                    new SequenceRandomSource()).Process(
+                    guild,
+                    new DefenseAssignment(100f, Array.Empty<string>()),
+                    selectionSettings,
+                    battleSettings);
+
+                Assert.That(result.Outcome, Is.EqualTo(DefenseOutcome.NoDefenders));
+                Assert.That(guild.Funds, Is.EqualTo(100));
+            }
+            finally
+            {
+                TestAssetFactory.Destroy(selectionSettings, battleSettings);
+            }
+        }
+
+        [Test]
+        public void Process_WithInvalidExplicitAssignment_DoesNotChangeGuildState()
+        {
+            CharacterRuntimeData character = CreateCharacter("member");
+            GuildRuntimeData guild = CreateGuild(character);
+            CpuSelectionSettings selectionSettings =
+                TestAssetFactory.CreateCpuSelectionSettings(desiredDefenseMembers: 2);
+            BattleBalanceSettings battleSettings = TestAssetFactory.CreateBattleSettings();
+
+            try
+            {
+                Assert.Throws<InvalidOperationException>(() =>
+                    new DefenseBattleProcessor(new SequenceRandomSource()).Process(
+                        guild,
+                        new DefenseAssignment(100f, new[] { "member", "member" }),
+                        selectionSettings,
+                        battleSettings));
+
+                Assert.That(character.Status, Is.EqualTo(CharacterStatus.Available));
+                Assert.That(guild.Funds, Is.EqualTo(100));
             }
             finally
             {

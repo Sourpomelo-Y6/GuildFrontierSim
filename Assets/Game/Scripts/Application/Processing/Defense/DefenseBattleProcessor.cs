@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GuildFrontierSim.Application.Assignments.Defense;
 using GuildFrontierSim.Application.Selection;
 using GuildFrontierSim.Data.Settings;
 using GuildFrontierSim.Domain.Battles;
@@ -14,16 +15,19 @@ namespace GuildFrontierSim.Application.Processing.Defense
         private readonly CpuMemberSelector memberSelector;
         private readonly BattleResolver battleResolver;
         private readonly IRandomSource randomSource;
+        private readonly DefenseAssignmentValidator assignmentValidator;
 
         public DefenseBattleProcessor(
             IRandomSource randomSource,
             CpuMemberSelector memberSelector = null,
-            BattleResolver battleResolver = null)
+            BattleResolver battleResolver = null,
+            DefenseAssignmentValidator assignmentValidator = null)
         {
             this.randomSource = randomSource ??
                 throw new ArgumentNullException(nameof(randomSource));
             this.memberSelector = memberSelector ?? new CpuMemberSelector();
             this.battleResolver = battleResolver ?? new BattleResolver(randomSource);
+            this.assignmentValidator = assignmentValidator ?? new DefenseAssignmentValidator();
         }
 
         public DefenseBattleResult Process(
@@ -52,7 +56,54 @@ namespace GuildFrontierSim.Application.Processing.Defense
                 selectionSettings,
                 battleSettings);
 
-            if (selection.SelectedMembers.Count == 0)
+            var defenderIds = new List<string>(selection.SelectedMembers.Count);
+            for (int index = 0; index < selection.SelectedMembers.Count; index++)
+            {
+                defenderIds.Add(selection.SelectedMembers[index].CharacterId);
+            }
+
+            return Process(
+                guild,
+                new DefenseAssignment(request.EnemyBasePower, defenderIds),
+                selectionSettings,
+                battleSettings);
+        }
+
+        public DefenseBattleResult Process(
+            GuildRuntimeData guild,
+            DefenseAssignment assignment,
+            CpuSelectionSettings selectionSettings,
+            BattleBalanceSettings battleSettings)
+        {
+            if (guild == null) throw new ArgumentNullException(nameof(guild));
+            if (assignment == null) throw new ArgumentNullException(nameof(assignment));
+
+            ValidateBattleSettings(battleSettings);
+            DefenseAssignmentValidationResult validation = assignmentValidator.Validate(
+                guild,
+                assignment,
+                selectionSettings);
+            if (!validation.IsValid)
+            {
+                throw new InvalidOperationException(
+                    $"Invalid defense assignment: {validation.Error} ({validation.CharacterId}).");
+            }
+
+            return ProcessDefenders(
+                guild,
+                validation.Defenders,
+                assignment.EnemyBasePower,
+                battleSettings);
+        }
+
+        private DefenseBattleResult ProcessDefenders(
+            GuildRuntimeData guild,
+            IReadOnlyList<CharacterRuntimeData> defenders,
+            float enemyBasePower,
+            BattleBalanceSettings battleSettings)
+        {
+
+            if (defenders.Count == 0)
             {
                 return new DefenseBattleResult(
                     DefenseOutcome.NoDefenders,
@@ -63,18 +114,18 @@ namespace GuildFrontierSim.Application.Processing.Defense
                     Array.Empty<string>());
             }
 
-            SetDefending(selection.SelectedMembers);
+            SetDefending(defenders);
             try
             {
                 BattleResult battleResult = battleResolver.Resolve(
-                    new BattleInput(selection.SelectedMembers, request.EnemyBasePower),
+                    new BattleInput(defenders, enemyBasePower),
                     battleSettings);
                 DefenseOutcome outcome = ToDefenseOutcome(battleResult.Outcome);
                 int reward = CalculateReward(outcome, battleSettings);
                 _ = checked(guild.Funds + reward);
 
                 DefenseBattleResult result = ApplyConsequences(
-                    selection.SelectedMembers,
+                    defenders,
                     battleResult,
                     outcome,
                     reward,
@@ -84,7 +135,7 @@ namespace GuildFrontierSim.Application.Processing.Defense
             }
             catch
             {
-                RestoreDefendingMembers(selection.SelectedMembers);
+                RestoreDefendingMembers(defenders);
                 throw;
             }
         }
